@@ -1,0 +1,49 @@
+Initial Setup:
+
+flutter testai_chart_quotes
+cd testai_chart_quotes
+
+
+
+Prompt 1: Base implementation
+
+Here is an empty Flutter Windows desktop application.
+Transform it into a currency quotes app that:
+1) Has main window that has a text input for days (default 50) and a refresh button. They located at the top of the window.
+2) Has chart with candlesticks to show EUR/USD daily rates in the main window. Chart takes all window space except space for other controls.
+3) Starts with empty data and only loads data when refresh button is clicked.
+4) When refresh button clicked it loads quotes from Alpha Vantage API and shows them in the chart. It loads number of quotes specified in days control.
+
+
+
+Prompt 2: Error handling
+
+Add error handling and logging into local file.
+
+
+
+Prompt 3: Indication
+
+Add a loading indicator that shows during API requests and disables the refresh button.
+
+
+
+Prompt 4: Input validation
+
+Add input validation for the days field.
+
+
+
+Prompt 5: Timeframes
+
+Add buttons at the window top named: M1, M5, M30, H1, H4, D. They should change how quotes are shown. It should change quotes period respectively to: 1 minute, 5 minutes, 30 minutes, 1 hour, 4 hours, 1 day.
+Button with current timeframe should be pressed, others are not. "D" is by default.
+When button is pressed and it's not current timeframe then respective quotes should be loaded and shown.
+Refresh button loads and shows qoutes with current timeframe.
+
+
+
+Prompt 6: Indicator
+
+Add checkbox "Show Simple Moving Average" (default is checked) at the window top, and add textbox after it labled "Period" (default 7).
+If checkbox is checked then on the chart it showd be shown simple moving average with specified period calculated from Close price.

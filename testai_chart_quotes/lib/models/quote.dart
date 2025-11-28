@@ -82,9 +82,11 @@ class Quote {
         close: close,
       );
     } catch (e, stackTrace) {
-      throw FormatException(
-        'Failed to create Quote from JSON. Date: $dateStr, Error: $e',
-        e,
+      Error.throwWithStackTrace(
+        FormatException(
+          'Failed to create Quote from JSON. Date: $dateStr, Error: $e',
+          e,
+        ),
         stackTrace,
       );
     }

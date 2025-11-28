@@ -66,18 +66,50 @@ class _QuotesPageState extends State<QuotesPage> {
   List<Quote> _quotes = [];
   bool _isLoading = false;
   String? _errorMessage;
+  String? _daysValidationError;
 
   @override
   void initState() {
     super.initState();
     _logger.info('QuotesPage initialized');
+    _daysController.addListener(_validateDays);
+    _validateDays(); // Validate initial value
   }
 
   @override
   void dispose() {
+    _daysController.removeListener(_validateDays);
     _daysController.dispose();
     _logger.info('QuotesPage disposed');
     super.dispose();
+  }
+
+  void _validateDays() {
+    final daysText = _daysController.text.trim();
+    String? error;
+
+    if (daysText.isEmpty) {
+      error = 'Days field cannot be empty';
+    } else {
+      final days = int.tryParse(daysText);
+      if (days == null) {
+        error = 'Please enter a valid number';
+      } else if (days <= 0) {
+        error = 'Days must be greater than 0';
+      } else if (days > 500) {
+        error = 'Days cannot exceed 500';
+      }
+    }
+
+    if (_daysValidationError != error) {
+      setState(() {
+        _daysValidationError = error;
+      });
+    }
+  }
+
+  bool get _isDaysInputValid {
+    return _daysValidationError == null;
   }
 
   Future<void> _loadQuotes() async {
@@ -182,19 +214,32 @@ class _QuotesPageState extends State<QuotesPage> {
                   child: TextField(
                     controller: _daysController,
                     keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(3), // Max 3 digits (500 max)
+                    ],
+                    decoration: InputDecoration(
+                      border: const OutlineInputBorder(),
+                      errorBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: Colors.red.shade700),
+                      ),
+                      focusedErrorBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: Colors.red.shade700, width: 2),
+                      ),
+                      errorText: _daysValidationError,
+                      errorMaxLines: 2,
+                      contentPadding: const EdgeInsets.symmetric(
                         horizontal: 12,
                         vertical: 8,
                       ),
+                      helperText: 'Range: 1-500',
+                      helperMaxLines: 1,
                     ),
                   ),
                 ),
                 const SizedBox(width: 16),
                 ElevatedButton.icon(
-                  onPressed: _isLoading ? null : _loadQuotes,
+                  onPressed: (_isLoading || !_isDaysInputValid) ? null : _loadQuotes,
                   icon: _isLoading
                       ? const SizedBox(
                           width: 16,

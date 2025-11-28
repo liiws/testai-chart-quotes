@@ -226,7 +226,20 @@ class _QuotesPageState extends State<QuotesPage> {
               padding: const EdgeInsets.all(16.0),
               child: _isLoading
                   ? const Center(
-                      child: CircularProgressIndicator(),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          CircularProgressIndicator(),
+                          SizedBox(height: 16),
+                          Text(
+                            'Loading quotes...',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ],
+                      ),
                     )
                   : CandlestickChart(quotes: _quotes),
             ),

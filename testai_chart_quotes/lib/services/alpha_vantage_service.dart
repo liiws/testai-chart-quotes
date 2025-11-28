@@ -8,7 +8,7 @@ enum Timeframe {
   m5('5min', 'FX_INTRADAY', 'Time Series FX (5min)'),
   m30('30min', 'FX_INTRADAY', 'Time Series FX (30min)'),
   h1('60min', 'FX_INTRADAY', 'Time Series FX (60min)'),
-  h4('60min', 'FX_INTRADAY', 'Time Series FX (60min)'), // Use 60min and aggregate
+  h4('30min', 'FX_INTRADAY', 'Time Series FX (30min)'), // Use 30min and aggregate to 4h
   d('', 'FX_DAILY', 'Time Series FX (Daily)');
 
   final String interval;
@@ -112,10 +112,11 @@ class AlphaVantageService {
 
       // Check for invalid API response
       if (!data.containsKey(timeframe.timeSeriesKey)) {
+        final availableKeys = data.keys.join(", ");
         await _logger.error(
-          'Invalid API response format. Keys: ${data.keys.join(", ")}',
+          'Invalid API response format. Expected "${timeframe.timeSeriesKey}", but got keys: $availableKeys',
         );
-        throw Exception('Invalid API response format. Expected "${timeframe.timeSeriesKey}"');
+        throw Exception('Invalid API response format. Expected "${timeframe.timeSeriesKey}". Available keys: $availableKeys');
       }
 
       final timeSeries = data[timeframe.timeSeriesKey];
@@ -245,7 +246,7 @@ class AlphaVantageService {
     DateTime? currentPeriodStart;
 
     for (final quote in quotes) {
-      // Round down to the nearest 4-hour period
+      // Round down to the nearest 4-hour period (0, 4, 8, 12, 16, 20)
       final hour = quote.date.hour;
       final periodHour = (hour ~/ 4) * 4;
       final periodStart = DateTime(
@@ -273,6 +274,7 @@ class AlphaVantageService {
         currentPeriodStart = periodStart;
       } else {
         // Aggregate into current 4-hour candle
+        // Keep the first open, highest high, lowest low, and last close
         currentCandle = Quote(
           date: currentPeriodStart!,
           open: currentCandle!.open, // Keep first open

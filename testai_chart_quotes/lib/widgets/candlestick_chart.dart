@@ -4,10 +4,14 @@ import 'candlestick_painter.dart';
 
 class CandlestickChart extends StatelessWidget {
   final List<Quote> quotes;
+  final bool showSMA;
+  final int smaPeriod;
 
   const CandlestickChart({
     super.key,
     required this.quotes,
+    this.showSMA = false,
+    this.smaPeriod = 7,
   });
 
   @override
@@ -21,9 +25,25 @@ class CandlestickChart extends StatelessWidget {
       );
     }
 
-    // Calculate min and max values for scaling
+    // Calculate SMA values if enabled
+    List<double?> smaValues = [];
+    if (showSMA && quotes.isNotEmpty && smaPeriod > 0) {
+      smaValues = _calculateSMA(quotes, smaPeriod);
+    }
+
+    // Calculate min and max values for scaling (include SMA if shown)
     double minPrice = quotes.map((q) => q.low).reduce((a, b) => a < b ? a : b);
     double maxPrice = quotes.map((q) => q.high).reduce((a, b) => a > b ? a : b);
+    
+    // Include SMA values in min/max calculation
+    if (showSMA && smaValues.isNotEmpty) {
+      for (final sma in smaValues) {
+        if (sma != null) {
+          if (sma < minPrice) minPrice = sma;
+          if (sma > maxPrice) maxPrice = sma;
+        }
+      }
+    }
     
     // Add some padding
     double priceRange = maxPrice - minPrice;
@@ -70,7 +90,7 @@ class CandlestickChart extends StatelessWidget {
               height: bottomPadding,
               child: _buildXAxisLabels(chartWidth),
             ),
-            // Candlesticks
+            // Candlesticks and SMA
             Positioned(
               left: leftPadding,
               top: topPadding,
@@ -81,6 +101,8 @@ class CandlestickChart extends StatelessWidget {
                   quotes: quotes,
                   minPrice: minPrice,
                   maxPrice: maxPrice,
+                  showSMA: showSMA,
+                  smaValues: smaValues,
                 ),
                 size: Size(chartWidth, chartHeight),
               ),
@@ -89,6 +111,26 @@ class CandlestickChart extends StatelessWidget {
         );
       },
     );
+  }
+
+  List<double?> _calculateSMA(List<Quote> quotes, int period) {
+    final smaValues = <double?>[];
+    
+    for (int i = 0; i < quotes.length; i++) {
+      if (i < period - 1) {
+        // Not enough data points yet
+        smaValues.add(null);
+      } else {
+        // Calculate SMA: sum of closes for the last 'period' candles
+        double sum = 0.0;
+        for (int j = i - period + 1; j <= i; j++) {
+          sum += quotes[j].close;
+        }
+        smaValues.add(sum / period);
+      }
+    }
+    
+    return smaValues;
   }
 
   Widget _buildYAxisLabels(double minPrice, double maxPrice, double chartHeight) {

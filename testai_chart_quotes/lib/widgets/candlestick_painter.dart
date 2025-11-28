@@ -6,12 +6,16 @@ class CandlestickPainter extends CustomPainter {
   final double minPrice;
   final double maxPrice;
   final double candleWidth;
+  final bool showSMA;
+  final List<double?> smaValues;
 
   CandlestickPainter({
     required this.quotes,
     required this.minPrice,
     required this.maxPrice,
     this.candleWidth = 8.0,
+    this.showSMA = false,
+    this.smaValues = const [],
   });
 
   @override
@@ -80,13 +84,43 @@ class CandlestickPainter extends CustomPainter {
         paint,
       );
     }
+
+    // Draw SMA line if enabled
+    if (showSMA && smaValues.isNotEmpty) {
+      final smaPaint = Paint()
+        ..color = Colors.blue
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.0;
+
+      final path = Path();
+      bool isFirstPoint = true;
+
+      for (int i = 0; i < quotes.length && i < smaValues.length; i++) {
+        final sma = smaValues[i];
+        if (sma != null) {
+          final x = (i + 0.5) * spacing;
+          final y = (maxPrice - sma) * scaleY;
+
+          if (isFirstPoint) {
+            path.moveTo(x, y);
+            isFirstPoint = false;
+          } else {
+            path.lineTo(x, y);
+          }
+        }
+      }
+
+      canvas.drawPath(path, smaPaint);
+    }
   }
 
   @override
   bool shouldRepaint(CandlestickPainter oldDelegate) {
     return oldDelegate.quotes != quotes ||
         oldDelegate.minPrice != minPrice ||
-        oldDelegate.maxPrice != maxPrice;
+        oldDelegate.maxPrice != maxPrice ||
+        oldDelegate.showSMA != showSMA ||
+        oldDelegate.smaValues != smaValues;
   }
 }
 

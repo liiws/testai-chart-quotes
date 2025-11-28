@@ -68,6 +68,9 @@ class _QuotesPageState extends State<QuotesPage> {
   String? _errorMessage;
   String? _daysValidationError;
   Timeframe _currentTimeframe = Timeframe.d; // Default to Daily
+  bool _showSMA = true; // Default checked
+  final TextEditingController _smaPeriodController = TextEditingController(text: '7');
+  String? _smaPeriodValidationError;
 
   @override
   void initState() {
@@ -75,12 +78,16 @@ class _QuotesPageState extends State<QuotesPage> {
     _logger.info('QuotesPage initialized');
     _daysController.addListener(_validateDays);
     _validateDays(); // Validate initial value
+    _smaPeriodController.addListener(_validateSMAPeriod);
+    _validateSMAPeriod(); // Validate initial value
   }
 
   @override
   void dispose() {
     _daysController.removeListener(_validateDays);
     _daysController.dispose();
+    _smaPeriodController.removeListener(_validateSMAPeriod);
+    _smaPeriodController.dispose();
     _logger.info('QuotesPage disposed');
     super.dispose();
   }
@@ -111,6 +118,39 @@ class _QuotesPageState extends State<QuotesPage> {
 
   bool get _isDaysInputValid {
     return _daysValidationError == null;
+  }
+
+  void _validateSMAPeriod() {
+    final periodText = _smaPeriodController.text.trim();
+    String? error;
+
+    if (periodText.isEmpty) {
+      error = 'Period cannot be empty';
+    } else {
+      final period = int.tryParse(periodText);
+      if (period == null) {
+        error = 'Please enter a valid number';
+      } else if (period <= 0) {
+        error = 'Period must be greater than 0';
+      } else if (period > 200) {
+        error = 'Period cannot exceed 200';
+      }
+    }
+
+    if (_smaPeriodValidationError != error) {
+      setState(() {
+        _smaPeriodValidationError = error;
+      });
+    }
+  }
+
+  bool get _isSMAPeriodValid {
+    return _smaPeriodValidationError == null;
+  }
+
+  int? get _smaPeriod {
+    if (!_isSMAPeriodValid) return null;
+    return int.tryParse(_smaPeriodController.text.trim());
   }
 
   Future<void> _loadQuotes() async {
@@ -293,6 +333,53 @@ class _QuotesPageState extends State<QuotesPage> {
                       : const Icon(Icons.refresh),
                   label: Text(_isLoading ? 'Loading...' : 'Refresh'),
                 ),
+                const SizedBox(width: 16),
+                Checkbox(
+                  value: _showSMA,
+                  onChanged: (value) {
+                    setState(() {
+                      _showSMA = value ?? true;
+                    });
+                  },
+                ),
+                const Text(
+                  'Show Simple Moving Average',
+                  style: TextStyle(fontSize: 14),
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  'Period:',
+                  style: TextStyle(fontSize: 14),
+                ),
+                const SizedBox(width: 4),
+                SizedBox(
+                  width: 60,
+                  child: TextField(
+                    controller: _smaPeriodController,
+                    enabled: _showSMA,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(3),
+                    ],
+                    decoration: InputDecoration(
+                      border: const OutlineInputBorder(),
+                      errorBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: Colors.red.shade700),
+                      ),
+                      focusedErrorBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: Colors.red.shade700, width: 2),
+                      ),
+                      errorText: _smaPeriodValidationError,
+                      errorMaxLines: 1,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 8,
+                      ),
+                      isDense: true,
+                    ),
+                  ),
+                ),
                 if (_errorMessage != null) ...[
                   const SizedBox(width: 16),
                   Expanded(
@@ -327,7 +414,11 @@ class _QuotesPageState extends State<QuotesPage> {
                         ],
                       ),
                     )
-                  : CandlestickChart(quotes: _quotes),
+                  : CandlestickChart(
+                      quotes: _quotes,
+                      showSMA: _showSMA,
+                      smaPeriod: _smaPeriod ?? 7,
+                    ),
             ),
           ),
         ],

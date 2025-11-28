@@ -291,32 +291,56 @@ class AlphaVantageService {
     // For H4, aggregate data into 4-hour candles
     List<Quote> processedQuotes = quotes;
     if (timeframe == Timeframe.h4) {
+      await _logger.info('Aggregating ${quotes.length} quotes into 4-hour candles');
       processedQuotes = _aggregateTo4Hour(quotes);
+      await _logger.info('Created ${processedQuotes.length} 4-hour candles from ${quotes.length} input quotes');
     }
 
-    // Calculate how many periods to return based on timeframe
-    int periodsToReturn = days;
-    if (timeframe == Timeframe.h4) {
-      // For H4, we want approximately days*6 periods (4 hours = 6 periods per day)
-      periodsToReturn = days * 6;
-    } else if (timeframe == Timeframe.h1) {
-      // For H1, we want days*24 periods
-      periodsToReturn = days * 24;
-    } else if (timeframe == Timeframe.m30) {
-      // For M30, we want days*48 periods
-      periodsToReturn = days * 48;
-    } else if (timeframe == Timeframe.m5) {
-      // For M5, we want days*288 periods
-      periodsToReturn = days * 288;
-    } else if (timeframe == Timeframe.m1) {
-      // For M1, we want days*1440 periods
-      periodsToReturn = days * 1440;
+    // Filter by date range for intraday timeframes, or by count for daily
+    List<Quote> result;
+    if (timeframe == Timeframe.d) {
+      // For daily, return the last N days
+      result = processedQuotes.length > days
+          ? processedQuotes.sublist(processedQuotes.length - days)
+          : processedQuotes;
+    } else {
+      // For intraday timeframes, filter by date range (last N days from now)
+      final cutoffDate = DateTime.now().subtract(Duration(days: days));
+      result = processedQuotes.where((quote) => quote.date.isAfter(cutoffDate)).toList();
+      
+      await _logger.info(
+        'Filtered ${processedQuotes.length} quotes to ${result.length} quotes within last $days days (cutoff: $cutoffDate)',
+      );
+      
+      // Calculate expected number of periods
+      int expectedPeriods;
+      if (timeframe == Timeframe.h4) {
+        expectedPeriods = days * 6; // 6 four-hour periods per day
+      } else if (timeframe == Timeframe.h1) {
+        expectedPeriods = days * 24; // 24 hours per day
+      } else if (timeframe == Timeframe.m30) {
+        expectedPeriods = days * 48; // 48 half-hours per day
+      } else if (timeframe == Timeframe.m5) {
+        expectedPeriods = days * 288; // 288 five-minute periods per day
+      } else if (timeframe == Timeframe.m1) {
+        expectedPeriods = days * 1440; // 1440 minutes per day
+      } else {
+        expectedPeriods = days * 100; // Default fallback
+      }
+      
+      // If we have fewer candles than expected, show all available (API limitation)
+      // If we have more, limit to expected amount
+      if (result.length > expectedPeriods) {
+        await _logger.info('Limiting result from ${result.length} to $expectedPeriods periods');
+        result = result.sublist(result.length - expectedPeriods);
+      } else if (result.length < expectedPeriods) {
+        await _logger.warning(
+          'Only ${result.length} candles available (expected $expectedPeriods). '
+          'This may be due to API limitations on intraday data availability.',
+        );
+        // Show all available candles - don't filter further
+      }
     }
-
-    // Return the last N periods
-    final result = processedQuotes.length > periodsToReturn
-        ? processedQuotes.sublist(processedQuotes.length - periodsToReturn)
-        : processedQuotes;
 
     final duration = DateTime.now().difference(startTime);
     await _logger.info(

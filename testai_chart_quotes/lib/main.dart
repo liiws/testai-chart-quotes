@@ -67,6 +67,7 @@ class _QuotesPageState extends State<QuotesPage> {
   bool _isLoading = false;
   String? _errorMessage;
   String? _daysValidationError;
+  Timeframe _currentTimeframe = Timeframe.d; // Default to Daily
 
   @override
   void initState() {
@@ -139,9 +140,9 @@ class _QuotesPageState extends State<QuotesPage> {
         throw ArgumentError('Days cannot exceed 500, got: $days');
       }
 
-      await _logger.info('Loading $days days of EUR/USD quotes');
+      await _logger.info('Loading $days days of EUR/USD quotes with timeframe ${_currentTimeframe.name}');
 
-      final quotes = await _apiService.fetchEURUSDQuotes(days);
+      final quotes = await _apiService.fetchEURUSDQuotes(days, timeframe: _currentTimeframe);
       
       if (quotes.isEmpty) {
         await _logger.warning('API returned empty quotes list');
@@ -184,11 +185,51 @@ class _QuotesPageState extends State<QuotesPage> {
     }
   }
 
+  void _onTimeframeChanged(Timeframe timeframe) {
+    if (timeframe != _currentTimeframe) {
+      setState(() {
+        _currentTimeframe = timeframe;
+      });
+      // Automatically load quotes for the new timeframe
+      _loadQuotes();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Column(
         children: [
+          // Timeframe buttons
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 2,
+                  offset: const Offset(0, 1),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildTimeframeButton('M1', Timeframe.m1),
+                const SizedBox(width: 8),
+                _buildTimeframeButton('M5', Timeframe.m5),
+                const SizedBox(width: 8),
+                _buildTimeframeButton('M30', Timeframe.m30),
+                const SizedBox(width: 8),
+                _buildTimeframeButton('H1', Timeframe.h1),
+                const SizedBox(width: 8),
+                _buildTimeframeButton('H4', Timeframe.h4),
+                const SizedBox(width: 8),
+                _buildTimeframeButton('D', Timeframe.d),
+              ],
+            ),
+          ),
           // Top controls
           Container(
             padding: const EdgeInsets.all(16.0),
@@ -290,6 +331,29 @@ class _QuotesPageState extends State<QuotesPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildTimeframeButton(String label, Timeframe timeframe) {
+    final isSelected = _currentTimeframe == timeframe;
+    return ElevatedButton(
+      onPressed: _isLoading ? null : () => _onTimeframeChanged(timeframe),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: isSelected
+            ? Theme.of(context).colorScheme.primary
+            : Theme.of(context).colorScheme.surface,
+        foregroundColor: isSelected
+            ? Theme.of(context).colorScheme.onPrimary
+            : Theme.of(context).colorScheme.onSurface,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        minimumSize: const Size(50, 36),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        ),
       ),
     );
   }

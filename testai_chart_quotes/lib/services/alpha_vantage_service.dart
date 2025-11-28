@@ -3,6 +3,21 @@ import 'package:http/http.dart' as http;
 import '../models/quote.dart';
 import 'logger_service.dart';
 
+enum Timeframe {
+  m1('1min', 'FX_INTRADAY', 'Time Series FX (1min)'),
+  m5('5min', 'FX_INTRADAY', 'Time Series FX (5min)'),
+  m30('30min', 'FX_INTRADAY', 'Time Series FX (30min)'),
+  h1('60min', 'FX_INTRADAY', 'Time Series FX (60min)'),
+  h4('60min', 'FX_INTRADAY', 'Time Series FX (60min)'), // Use 60min and aggregate
+  d('', 'FX_DAILY', 'Time Series FX (Daily)');
+
+  final String interval;
+  final String function;
+  final String timeSeriesKey;
+
+  const Timeframe(this.interval, this.function, this.timeSeriesKey);
+}
+
 class AlphaVantageService {
   // IMPORTANT: Replace 'demo' with your own free API key from https://www.alphavantage.co/support/#api-key
   // The demo key has very limited rate limits. Get your free key to avoid rate limit errors.
@@ -10,7 +25,7 @@ class AlphaVantageService {
   static const String _baseUrl = 'https://www.alphavantage.co/query';
   final LoggerService _logger = LoggerService();
 
-  Future<List<Quote>> fetchEURUSDQuotes(int days) async {
+  Future<List<Quote>> fetchEURUSDQuotes(int days, {Timeframe timeframe = Timeframe.d}) async {
     final startTime = DateTime.now();
     
     try {
@@ -22,11 +37,18 @@ class AlphaVantageService {
         throw ArgumentError('Days cannot exceed 500, got: $days');
       }
 
-      await _logger.info('Fetching EUR/USD quotes for $days days');
+      await _logger.info('Fetching EUR/USD quotes for $days days with timeframe ${timeframe.name}');
 
-      final url = Uri.parse(
-        '$_baseUrl?function=FX_DAILY&from_symbol=EUR&to_symbol=USD&apikey=$_apiKey',
-      );
+      String urlString;
+      if (timeframe == Timeframe.d) {
+        // Daily timeframe
+        urlString = '$_baseUrl?function=${timeframe.function}&from_symbol=EUR&to_symbol=USD&apikey=$_apiKey';
+      } else {
+        // Intraday timeframe
+        urlString = '$_baseUrl?function=${timeframe.function}&from_symbol=EUR&to_symbol=USD&interval=${timeframe.interval}&apikey=$_apiKey';
+      }
+
+      final url = Uri.parse(urlString);
 
       await _logger.debug('API Request URL: ${url.toString().replaceAll(_apiKey, '***')}');
 
@@ -89,17 +111,17 @@ class AlphaVantageService {
       }
 
       // Check for invalid API response
-      if (!data.containsKey('Time Series FX (Daily)')) {
+      if (!data.containsKey(timeframe.timeSeriesKey)) {
         await _logger.error(
           'Invalid API response format. Keys: ${data.keys.join(", ")}',
         );
-        throw Exception('Invalid API response format. Expected "Time Series FX (Daily)"');
+        throw Exception('Invalid API response format. Expected "${timeframe.timeSeriesKey}"');
       }
 
-      final timeSeries = data['Time Series FX (Daily)'];
+      final timeSeries = data[timeframe.timeSeriesKey];
       if (timeSeries is! Map<String, dynamic>) {
-        await _logger.error('Time Series FX (Daily) is not a Map');
-        throw Exception('Invalid API response: Time Series FX (Daily) format error');
+        await _logger.error('${timeframe.timeSeriesKey} is not a Map');
+        throw Exception('Invalid API response: ${timeframe.timeSeriesKey} format error');
       }
 
       if (timeSeries.isEmpty) {
@@ -145,10 +167,35 @@ class AlphaVantageService {
       // Sort by date
       quotes.sort((a, b) => a.date.compareTo(b.date));
 
-      // Return the last N days
-      final result = quotes.length > days
-          ? quotes.sublist(quotes.length - days)
-          : quotes;
+      // For H4, aggregate 60min data into 4-hour candles
+      List<Quote> processedQuotes = quotes;
+      if (timeframe == Timeframe.h4) {
+        processedQuotes = _aggregateTo4Hour(quotes);
+      }
+
+      // Calculate how many periods to return based on timeframe
+      int periodsToReturn = days;
+      if (timeframe == Timeframe.h4) {
+        // For H4, we want approximately days*6 periods (4 hours = 6 periods per day)
+        periodsToReturn = days * 6;
+      } else if (timeframe == Timeframe.h1) {
+        // For H1, we want days*24 periods
+        periodsToReturn = days * 24;
+      } else if (timeframe == Timeframe.m30) {
+        // For M30, we want days*48 periods
+        periodsToReturn = days * 48;
+      } else if (timeframe == Timeframe.m5) {
+        // For M5, we want days*288 periods
+        periodsToReturn = days * 288;
+      } else if (timeframe == Timeframe.m1) {
+        // For M1, we want days*1440 periods
+        periodsToReturn = days * 1440;
+      }
+
+      // Return the last N periods
+      final result = processedQuotes.length > periodsToReturn
+          ? processedQuotes.sublist(processedQuotes.length - periodsToReturn)
+          : processedQuotes;
 
       final duration = DateTime.now().difference(startTime);
       await _logger.info(
@@ -188,6 +235,60 @@ class AlphaVantageService {
       }
       throw Exception('Unexpected error: $e');
     }
+  }
+
+  List<Quote> _aggregateTo4Hour(List<Quote> quotes) {
+    if (quotes.isEmpty) return [];
+
+    final aggregated = <Quote>[];
+    Quote? currentCandle;
+    DateTime? currentPeriodStart;
+
+    for (final quote in quotes) {
+      // Round down to the nearest 4-hour period
+      final hour = quote.date.hour;
+      final periodHour = (hour ~/ 4) * 4;
+      final periodStart = DateTime(
+        quote.date.year,
+        quote.date.month,
+        quote.date.day,
+        periodHour,
+        0,
+        0,
+      );
+
+      if (currentPeriodStart == null || periodStart != currentPeriodStart!) {
+        // Save previous candle if exists
+        if (currentCandle != null) {
+          aggregated.add(currentCandle);
+        }
+        // Start new 4-hour candle
+        currentCandle = Quote(
+          date: periodStart,
+          open: quote.open,
+          high: quote.high,
+          low: quote.low,
+          close: quote.close,
+        );
+        currentPeriodStart = periodStart;
+      } else {
+        // Aggregate into current 4-hour candle
+        currentCandle = Quote(
+          date: currentPeriodStart!,
+          open: currentCandle!.open, // Keep first open
+          high: currentCandle.high > quote.high ? currentCandle.high : quote.high,
+          low: currentCandle.low < quote.low ? currentCandle.low : quote.low,
+          close: quote.close, // Use last close
+        );
+      }
+    }
+
+    // Add the last candle
+    if (currentCandle != null) {
+      aggregated.add(currentCandle);
+    }
+
+    return aggregated;
   }
 }
 

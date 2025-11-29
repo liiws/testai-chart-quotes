@@ -80,8 +80,12 @@ class _QuotesHomePageState extends State<QuotesHomePage> {
             volume: 0,
           ));
         }
+        // Filter out any candles with non-finite values (extra safety)
+        final validCandles = candles.where((c) =>
+          [c.open, c.high, c.low, c.close].every((v) => v.isFinite)
+        ).toList();
         setState(() {
-          _candles = candles;
+          _candles = validCandles;
           _loading = false;
         });
       } else {
@@ -150,26 +154,12 @@ class _QuotesHomePageState extends State<QuotesHomePage> {
             ),
           ),
           Expanded(
-            child: _canShowChart(_candles)
-                ? Candlesticks(candles: _candles)
-                : const Center(child: Text('Not enough valid data to display chart.')),
+            child: (_candles.length < 2)
+                ? const Center(child: Text('No chartable data.'))
+                : Candlesticks(
+                    candles: _candles,
+                  ),
           ),
-          bool _canShowChart(List<Candle> candles) {
-            if (candles.length < 2) return false;
-            if (!candles.every((c) => c.open.isFinite && c.high.isFinite && c.low.isFinite && c.close.isFinite)) {
-              return false;
-            }
-            // Check if all values are identical (which causes division by zero in chart)
-            final first = candles.first;
-            final allSame = candles.every((c) =>
-              c.open == first.open &&
-              c.high == first.high &&
-              c.low == first.low &&
-              c.close == first.close
-            );
-            if (allSame) return false;
-            return true;
-          }
         ],
       ),
     );

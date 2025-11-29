@@ -67,13 +67,13 @@ class _CurrencyQuotesAppState extends State<CurrencyQuotesApp> {
       _error = null;
     });
 
-    const apiKey = 'demo';
+    const apiKey = 'YOUR_REAL_API_KEY'; // Replace with your Alpha Vantage API Key
     String url;
     if (_period == Period.d) {
-      url = 'https://www.alphavantage.co/query?function=FX_DAILY&from_symbol=EUR&to_symbol=USD&apikey=demo';
+      url = 'https://www.alphavantage.co/query?function=FX_DAILY&from_symbol=EUR&to_symbol=USD&apikey=$apiKey';
     } else {
       final interval = periodInterval[_period]!;
-      url = 'https://www.alphavantage.co/query?function=FX_INTRADAY&from_symbol=EUR&to_symbol=USD&interval=$interval&outputsize=full&apikey=demo';
+      url = 'https://www.alphavantage.co/query?function=FX_INTRADAY&from_symbol=EUR&to_symbol=USD&interval=$interval&outputsize=full&apikey=$apiKey';
     }
     try {
       final response = await http.get(Uri.parse(url));

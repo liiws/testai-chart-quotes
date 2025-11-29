@@ -34,6 +34,8 @@ class _CurrencyQuotesAppState extends State<CurrencyQuotesApp> {
   bool _loading = false;
   String? _error;
   Period _period = Period.d; // default to daily
+  bool _showSMA = true;
+  final TextEditingController _smaPeriodController = TextEditingController(text: '7');
 
   static const periodLabels = {
     Period.m1: 'M1', Period.m5: 'M5', Period.m30: 'M30', Period.h1: 'H1', Period.h4: 'H4', Period.d: 'D',
@@ -67,7 +69,7 @@ class _CurrencyQuotesAppState extends State<CurrencyQuotesApp> {
       _error = null;
     });
 
-    const apiKey = 'YOUR_REAL_API_KEY'; // Replace with your Alpha Vantage API Key
+    const apiKey = 'demo'; // Replace with your Alpha Vantage API Key
     String url;
     if (_period == Period.d) {
       url = 'https://www.alphavantage.co/query?function=FX_DAILY&from_symbol=EUR&to_symbol=USD&apikey=$apiKey';
@@ -138,6 +140,22 @@ class _CurrencyQuotesAppState extends State<CurrencyQuotesApp> {
     }
   }
 
+  List<_SMAData> _computeSMA(List<CandleData> candles, int period) {
+    // If too short, return all as null except first period-1, which are empty
+    final sma = <_SMAData>[];
+    for (int i = 0; i < candles.length; i++) {
+      if (i + 1 >= period) {
+        double sum = 0;
+        for (int j = i + 1 - period; j <= i; j++) sum += candles[j].close;
+        double avg = sum / period;
+        sma.add(_SMAData(date: candles[i].date, value: avg));
+      } else {
+        sma.add(_SMAData(date: candles[i].date, value: null));
+      }
+    }
+    return sma;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -169,6 +187,39 @@ class _CurrencyQuotesAppState extends State<CurrencyQuotesApp> {
                   ),
                 );
               }).toList(),
+            ),
+          ),
+          // --- SMA controls row ---
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.start,
+              children: [
+                Checkbox(
+                  value: _showSMA,
+                  onChanged: _loading
+                    ? null
+                    : (val) => setState(() { _showSMA = val ?? true; }),
+                ),
+                const Text('Show Simple Moving Average'),
+                const SizedBox(width: 16),
+                const Text('Period:'),
+                const SizedBox(width: 6),
+                SizedBox(
+                  width: 48,
+                  child: TextField(
+                    controller: _smaPeriodController,
+                    enabled: _showSMA && !_loading,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(vertical: 6, horizontal: 6),
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: (_) => setState(() {}), // updates chart
+                  ),
+                ),
+              ],
             ),
           ),
           Padding(
@@ -206,7 +257,7 @@ class _CurrencyQuotesAppState extends State<CurrencyQuotesApp> {
                     ? const Center(child: Text('No data loaded.'))
                     : SfCartesianChart(
                         primaryXAxis: DateTimeAxis(),
-                        series: <CandleSeries<CandleData, DateTime>>[
+                        series: <CartesianSeries<dynamic, DateTime>>[
                           CandleSeries<CandleData, DateTime>(
                             dataSource: _candles,
                             xValueMapper: (CandleData d, _) => d.date,
@@ -215,7 +266,26 @@ class _CurrencyQuotesAppState extends State<CurrencyQuotesApp> {
                             openValueMapper: (CandleData d, _) => d.open,
                             closeValueMapper: (CandleData d, _) => d.close,
                           ),
+                          if (_showSMA)
+                            ...(() {
+                              int period = int.tryParse(_smaPeriodController.text) ?? 7;
+                              if (period < 1) period = 1;
+                              if (period > _candles.length) period = _candles.length;
+                              final smaData = _computeSMA(_candles, period)
+                                  .where((d) => d.value != null).toList();
+                              return [
+                                LineSeries<_SMAData, DateTime>(
+                                  dataSource: smaData,
+                                  xValueMapper: (d, _) => d.date,
+                                  yValueMapper: (d, _) => d.value,
+                                  color: Colors.blue,
+                                  width: 2,
+                                  name: 'SMA ($period)',
+                                )
+                              ];
+                            })(),
                         ],
+                        legend: Legend(isVisible: _showSMA),
                       ),
           ),
         ],
@@ -231,4 +301,11 @@ class CandleData {
   final double low;
   final double close;
   CandleData({required this.date, required this.open, required this.high, required this.low, required this.close});
+}
+
+// Helper for SMA
+class _SMAData {
+  final DateTime date;
+  final double? value;
+  _SMAData({required this.date, required this.value});
 }

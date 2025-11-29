@@ -150,16 +150,26 @@ class _QuotesHomePageState extends State<QuotesHomePage> {
             ),
           ),
           Expanded(
-            child: _candles.length < 2 || !_candles.every((c) =>
-                c.open.isFinite &&
-                c.high.isFinite &&
-                c.low.isFinite &&
-                c.close.isFinite)
-              ? const Center(child: Text('Not enough valid data to display chart.'))
-              : Candlesticks(
-                  candles: _candles,
-                ),
+            child: _canShowChart(_candles)
+                ? Candlesticks(candles: _candles)
+                : const Center(child: Text('Not enough valid data to display chart.')),
           ),
+          bool _canShowChart(List<Candle> candles) {
+            if (candles.length < 2) return false;
+            if (!candles.every((c) => c.open.isFinite && c.high.isFinite && c.low.isFinite && c.close.isFinite)) {
+              return false;
+            }
+            // Check if all values are identical (which causes division by zero in chart)
+            final first = candles.first;
+            final allSame = candles.every((c) =>
+              c.open == first.open &&
+              c.high == first.high &&
+              c.low == first.low &&
+              c.close == first.close
+            );
+            if (allSame) return false;
+            return true;
+          }
         ],
       ),
     );

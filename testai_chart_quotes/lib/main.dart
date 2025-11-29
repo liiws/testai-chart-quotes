@@ -121,10 +121,10 @@ class _CurrencyQuotesAppState extends State<CurrencyQuotesApp> {
         break;
     }
     if (interval != null) {
-      url = 'https://www.alphavantage.co/query?function=FX_INTRADAY&from_symbol=EUR&to_symbol=USD&interval=$interval&apikey=$apiKey&outputsize=full';
+      url = 'https://www.alphavantage.co/query?function=FX_INTRADAY&from_symbol=EUR&to_symbol=USD&interval=$interval&apikey=$apiKey';
       timeSeriesKey = 'Time Series FX ($interval)';
     } else {
-      url = 'https://www.alphavantage.co/query?function=FX_DAILY&from_symbol=EUR&to_symbol=USD&apikey=$apiKey&outputsize=full';
+      url = 'https://www.alphavantage.co/query?function=FX_DAILY&from_symbol=EUR&to_symbol=USD&apikey=$apiKey';
       timeSeriesKey = 'Time Series FX (Daily)';
     }
     try {

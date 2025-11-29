@@ -150,11 +150,15 @@ class _QuotesHomePageState extends State<QuotesHomePage> {
             ),
           ),
           Expanded(
-            child: _candles.isEmpty
-                ? const Center(child: Text('No data.'))
-                : Candlesticks(
-                    candles: _candles,
-                  ),
+            child: _candles.length < 2 || !_candles.every((c) =>
+                c.open.isFinite &&
+                c.high.isFinite &&
+                c.low.isFinite &&
+                c.close.isFinite)
+              ? const Center(child: Text('Not enough valid data to display chart.'))
+              : Candlesticks(
+                  candles: _candles,
+                ),
           ),
         ],
       ),

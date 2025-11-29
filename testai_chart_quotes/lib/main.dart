@@ -27,6 +27,30 @@ class CurrencyQuotesApp extends StatefulWidget {
 }
 
 class _CurrencyQuotesAppState extends State<CurrencyQuotesApp> {
+  String? _daysError;
+
+  bool get _isDaysValid {
+    final text = _daysController.text;
+    if (text.isEmpty) return false;
+    final value = int.tryParse(text);
+    return value != null && value > 0 && value <= 5000;
+  }
+
+  void _validateDays() {
+    final text = _daysController.text;
+    if (text.isEmpty) {
+      setState(() => _daysError = 'Enter number of days');
+    } else {
+      final value = int.tryParse(text);
+      if (value == null || value <= 0) {
+        setState(() => _daysError = 'Enter a positive integer');
+      } else if (value > 5000) {
+        setState(() => _daysError = 'Maximum is 5000');
+      } else {
+        setState(() => _daysError = null);
+      }
+    }
+  }
 
     Future<void> _logError(String message) async {
       final now = DateTime.now().toIso8601String();
@@ -134,12 +158,17 @@ class _CurrencyQuotesAppState extends State<CurrencyQuotesApp> {
                   child: TextField(
                     controller: _daysController,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(border: OutlineInputBorder()),
+                    decoration: InputDecoration(
+                      border: const OutlineInputBorder(),
+                      errorText: _daysError,
+                      isDense: true,
+                    ),
+                    onChanged: (_) => _validateDays(),
                   ),
                 ),
                 const SizedBox(width: 12),
                 ElevatedButton(
-                  onPressed: _loading ? null : _fetchCandles,
+                  onPressed: _loading || !_isDaysValid ? null : _fetchCandles,
                   child: _loading ? const SizedBox(width:16, height:16, child:CircularProgressIndicator(strokeWidth:2)) : const Text('Refresh'),
                 ),
                 if (_error != null) ...[

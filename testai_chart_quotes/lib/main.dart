@@ -23,21 +23,22 @@ Future<List<Candle>> fetchForexCandles({int days = 50}) async {
     throw Exception('Malformed API response or invalid API key/usage.');
   }
 
-  final candles = <Candle>[];
-  final sortedDates = (timeseries.keys.toList()..sort((a, b) => a.compareTo(b)));
-  for (final dateStr in sortedDates.take(days)) {
-    final entry = timeseries[dateStr];
+  final List<MapEntry<String, dynamic>> sortedEntries = timeseries.entries
+      .where((e) => e.value != null)
+      .cast<MapEntry<String, dynamic>>()
+      .toList()
+      ..sort((a, b) => a.key.compareTo(b.key)); // ascending date
+
+  final List<Candle> validCandles = [];
+  for (final entry in sortedEntries) {
     try {
-      final open = double.parse(entry['1. open']);
-      final high = double.parse(entry['2. high']);
-      final low = double.parse(entry['3. low']);
-      final close = double.parse(entry['4. close']);
-      if ([open, high, low, close].any((val) =>
-          val.isNaN || val.isInfinite)) {
-        continue; // Skip invalid/NaN values
-      }
-      candles.add(Candle(
-        date: DateTime.parse(dateStr),
+      final open = double.parse(entry.value['1. open']);
+      final high = double.parse(entry.value['2. high']);
+      final low = double.parse(entry.value['3. low']);
+      final close = double.parse(entry.value['4. close']);
+      if ([open, high, low, close].any((val) => val.isNaN || val.isInfinite)) continue;
+      validCandles.add(Candle(
+        date: DateTime.parse(entry.key),
         open: open,
         high: high,
         low: low,
@@ -45,13 +46,15 @@ Future<List<Candle>> fetchForexCandles({int days = 50}) async {
         volume: 0,
       ));
     } catch (e) {
-      continue; // Robustly skip if parsing fails
+      continue;
     }
   }
-  if (candles.isEmpty) {
-    throw Exception('No valid price data returned. Check your API key or try again later.');
+  if (validCandles.length < days) {
+    throw Exception(
+        'Received only ${validCandles.length} valid data points, fewer than requested ($days). Check your API key, try fewer days, or try again later.');
   }
-  return candles;
+  // Only return the most recent N valid candles (ascending order expected by the package)
+  return validCandles.sublist(validCandles.length - days);
 }
 
 void main() {

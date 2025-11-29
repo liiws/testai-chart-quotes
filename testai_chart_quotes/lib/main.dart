@@ -39,7 +39,13 @@ class _CurrencyQuotesAppState extends State<CurrencyQuotesApp> {
   }
 
   Future<void> _fetchCandles() async {
-    final days = int.tryParse(_daysController.text) ?? 50;
+    final days = int.tryParse(_daysController.text);
+    if (days == null || days < 1 || days > 500) {
+      setState(() {
+        _error = 'Please enter a valid number of days (1-500).';
+      });
+      return;
+    }
     setState(() {
       _loading = true;
       _candles = [];

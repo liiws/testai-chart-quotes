@@ -40,7 +40,7 @@ class _CurrencyQuotesAppState extends State<CurrencyQuotesApp> {
     });
 
     const apiKey = 'demo'; // Replace with your Alpha Vantage API Key
-    final url = 'https://www.alphavantage.co/query?function=FX_DAILY&from_symbol=EUR&to_symbol=USD&apikey=$apiKey&outputsize=compact';
+    final url = 'https://www.alphavantage.co/query?function=FX_DAILY&from_symbol=EUR&to_symbol=USD&apikey=demo';
     try {
       final response = await http.get(Uri.parse(url));
       if (response.statusCode == 200) {

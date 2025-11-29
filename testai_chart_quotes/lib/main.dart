@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:io';
 
 void main() {
   runApp(const MainApp());
@@ -30,6 +31,12 @@ class _CurrencyQuotesAppState extends State<CurrencyQuotesApp> {
   List<CandleData> _candles = [];
   bool _loading = false;
   String? _error;
+
+  Future<void> _logError(String message) async {
+    final logFile = File('error_log.txt');
+    final now = DateTime.now().toIso8601String();
+    await logFile.writeAsString('$now: $message\n', mode: FileMode.append);
+  }
 
   Future<void> _fetchCandles() async {
     final days = int.tryParse(_daysController.text) ?? 50;
@@ -63,28 +70,34 @@ class _CurrencyQuotesAppState extends State<CurrencyQuotesApp> {
             _candles = candles.reversed.toList(); // Oldest to latest
           });
         } else if (data.containsKey('Error Message')) {
+          await _logError('Error Message: ' + data['Error Message']);
           setState(() {
             _error = data['Error Message'];
           });
         } else if (data.containsKey('Note')) {
+          await _logError('Note: ' + data['Note']);
           setState(() {
             _error = data['Note'];
           });
         } else if (data.containsKey('Information')) {
+          await _logError('Information: ' + data['Information']);
           setState(() {
             _error = data['Information'];
           });
         } else {
+          await _logError('Unexpected response: ' + response.body);
           setState(() {
-            _error = 'Unexpected response format: \n${response.body}';
+            _error = 'Unexpected response format: \n' + response.body;
           });
         }
       } else {
+        await _logError('HTTP error: ' + response.statusCode.toString() + ' Body: ' + response.body);
         setState(() {
-          _error = 'Error: ${response.statusCode}';
+          _error = 'Error:  {response.statusCode}';
         });
       }
     } catch (e) {
+      await _logError('Exception: ' + e.toString());
       setState(() {
         _error = 'Failed to fetch data: $e';
       });

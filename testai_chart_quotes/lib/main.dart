@@ -378,11 +378,6 @@ class _CurrencyQuotesAppState extends State<CurrencyQuotesApp> {
               ],
             ),
           ),
-        class SmaData {
-          final DateTime date;
-          final double value;
-          SmaData({required this.date, required this.value});
-        }
         ],
       ),
     );

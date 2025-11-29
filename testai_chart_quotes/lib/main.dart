@@ -26,7 +26,10 @@ class CurrencyQuotesApp extends StatefulWidget {
   State<CurrencyQuotesApp> createState() => _CurrencyQuotesAppState();
 }
 
+enum Timeframe { m1, m5, m30, h1, h4, d }
+
 class _CurrencyQuotesAppState extends State<CurrencyQuotesApp> {
+  Timeframe _currentTimeframe = Timeframe.d;
   String? _daysError;
 
   bool get _isDaysValid {
@@ -67,40 +70,102 @@ class _CurrencyQuotesAppState extends State<CurrencyQuotesApp> {
   bool _loading = false;
   String? _error;
 
-  Future<void> _fetchCandles() async {
+  Future<void> _fetchCandles({Timeframe? tf}) async {
     final days = int.tryParse(_daysController.text) ?? 50;
+    final timeframe = tf ?? _currentTimeframe;
     setState(() {
       _loading = true;
       _candles = [];
       _error = null;
+      if (tf != null) _currentTimeframe = tf;
     });
 
     const apiKey = 'demo'; // Replace with your Alpha Vantage API Key
-    final url = 'https://www.alphavantage.co/query?function=FX_DAILY&from_symbol=EUR&to_symbol=USD&apikey=demo';
+    String url;
+    String? timeSeriesKey;
+    String? interval;
+    switch (timeframe) {
+      case Timeframe.m1:
+        interval = '1min';
+        break;
+      case Timeframe.m5:
+        interval = '5min';
+        break;
+      case Timeframe.m30:
+        interval = '30min';
+        break;
+      case Timeframe.h1:
+        interval = '60min';
+        break;
+      case Timeframe.h4:
+        interval = '60min'; // Will group by 4h later
+        break;
+      case Timeframe.d:
+        interval = null;
+        break;
+    }
+    if (interval != null) {
+      url = 'https://www.alphavantage.co/query?function=FX_INTRADAY&from_symbol=EUR&to_symbol=USD&interval=$interval&apikey=$apiKey&outputsize=full';
+      timeSeriesKey = 'Time Series FX ($interval)';
+    } else {
+      url = 'https://www.alphavantage.co/query?function=FX_DAILY&from_symbol=EUR&to_symbol=USD&apikey=$apiKey&outputsize=full';
+      timeSeriesKey = 'Time Series FX (Daily)';
+    }
     try {
       final response = await http.get(Uri.parse(url));
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = json.decode(response.body);
-        if (data.containsKey('Time Series FX (Daily)')) {
-          final series = data['Time Series FX (Daily)'] as Map<String, dynamic>;
+        if (data.containsKey(timeSeriesKey)) {
+          final series = data[timeSeriesKey] as Map<String, dynamic>;
           final sortedDates = series.keys.toList()..sort((a, b) => b.compareTo(a));
-          final candles = <CandleData>[];
-          for (final date in sortedDates.take(days)) {
-            try {
-              final candle = series[date];
-              candles.add(CandleData(
-                date: DateTime.parse(date),
-                open: double.parse(candle['1. open']),
-                high: double.parse(candle['2. high']),
-                low: double.parse(candle['3. low']),
-                close: double.parse(candle['4. close']),
-              ));
-            } catch (e) {
-              await _logError('Parse error for date $date: $e, data: ${series[date]}');
+          List<CandleData> candles = [];
+          if (timeframe == Timeframe.h4) {
+            // Group 60min candles into 4h candles
+            final grouped = <DateTime, List<Map<String, dynamic>>>{};
+            for (final dateStr in sortedDates.take(days * 4)) {
+              final dt = DateTime.parse(dateStr);
+              final groupKey = DateTime(dt.year, dt.month, dt.day, (dt.hour ~/ 4) * 4);
+              grouped.putIfAbsent(groupKey, () => []).add(series[dateStr]);
             }
+            final groupedKeys = grouped.keys.toList()..sort((a, b) => b.compareTo(a));
+            for (final key in groupedKeys.take(days)) {
+              final group = grouped[key]!;
+              try {
+                final opens = group.map((e) => double.parse(e['1. open'])).toList();
+                final highs = group.map((e) => double.parse(e['2. high'])).toList();
+                final lows = group.map((e) => double.parse(e['3. low'])).toList();
+                final closes = group.map((e) => double.parse(e['4. close'])).toList();
+                candles.add(CandleData(
+                  date: key,
+                  open: opens.first,
+                  high: highs.reduce((a, b) => a > b ? a : b),
+                  low: lows.reduce((a, b) => a < b ? a : b),
+                  close: closes.last,
+                ));
+              } catch (e) {
+                await _logError('Parse error for 4h group $key: $e, data: $group');
+              }
+            }
+            candles = candles.reversed.toList();
+          } else {
+            for (final date in sortedDates.take(days)) {
+              try {
+                final candle = series[date];
+                candles.add(CandleData(
+                  date: DateTime.parse(date),
+                  open: double.parse(candle['1. open']),
+                  high: double.parse(candle['2. high']),
+                  low: double.parse(candle['3. low']),
+                  close: double.parse(candle['4. close']),
+                ));
+              } catch (e) {
+                await _logError('Parse error for date $date: $e, data: ${series[date]}');
+              }
+            }
+            candles = candles.reversed.toList();
           }
           setState(() {
-            _candles = candles.reversed.toList(); // Oldest to latest
+            _candles = candles;
           });
         } else if (data.containsKey('Error Message')) {
           await _logError('API Error Message: ${data['Error Message']}');
@@ -148,9 +213,26 @@ class _CurrencyQuotesAppState extends State<CurrencyQuotesApp> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.all(8.0),
+            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
             child: Row(
               children: [
+                // Timeframe buttons
+                for (final tf in Timeframe.values) ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 2.0),
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _currentTimeframe == tf ? Theme.of(context).colorScheme.primary : Colors.grey[300],
+                        foregroundColor: _currentTimeframe == tf ? Colors.white : Colors.black,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        minimumSize: const Size(0, 36),
+                      ),
+                      onPressed: _loading || _currentTimeframe == tf ? null : () => _fetchCandles(tf: tf),
+                      child: Text(_tfLabel(tf)),
+                    ),
+                  ),
+                ],
+                const SizedBox(width: 16),
                 const Text('Days:'),
                 const SizedBox(width: 8),
                 SizedBox(
@@ -168,7 +250,7 @@ class _CurrencyQuotesAppState extends State<CurrencyQuotesApp> {
                 ),
                 const SizedBox(width: 12),
                 ElevatedButton(
-                  onPressed: _loading || !_isDaysValid ? null : _fetchCandles,
+                  onPressed: _loading || !_isDaysValid ? null : () => _fetchCandles(),
                   child: _loading ? const SizedBox(width:16, height:16, child:CircularProgressIndicator(strokeWidth:2)) : const Text('Refresh'),
                 ),
                 if (_error != null) ...[
@@ -211,6 +293,22 @@ class _CurrencyQuotesAppState extends State<CurrencyQuotesApp> {
         ],
       ),
     );
+    String _tfLabel(Timeframe tf) {
+      switch (tf) {
+        case Timeframe.m1:
+          return 'M1';
+        case Timeframe.m5:
+          return 'M5';
+        case Timeframe.m30:
+          return 'M30';
+        case Timeframe.h1:
+          return 'H1';
+        case Timeframe.h4:
+          return 'H4';
+        case Timeframe.d:
+          return 'D';
+      }
+    }
   }
 }
 

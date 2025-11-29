@@ -143,21 +143,23 @@ class _CurrencyQuotesAppState extends State<CurrencyQuotesApp> {
             ),
           ),
           Expanded(
-            child: _candles.isEmpty
-                ? const Center(child: Text('No data loaded.'))
-                : SfCartesianChart(
-                    primaryXAxis: DateTimeAxis(),
-                    series: <CandleSeries<CandleData, DateTime>>[
-                      CandleSeries<CandleData, DateTime>(
-                        dataSource: _candles,
-                        xValueMapper: (CandleData d, _) => d.date,
-                        lowValueMapper: (CandleData d, _) => d.low,
-                        highValueMapper: (CandleData d, _) => d.high,
-                        openValueMapper: (CandleData d, _) => d.open,
-                        closeValueMapper: (CandleData d, _) => d.close,
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _candles.isEmpty
+                    ? const Center(child: Text('No data loaded.'))
+                    : SfCartesianChart(
+                        primaryXAxis: DateTimeAxis(),
+                        series: <CandleSeries<CandleData, DateTime>>[
+                          CandleSeries<CandleData, DateTime>(
+                            dataSource: _candles,
+                            xValueMapper: (CandleData d, _) => d.date,
+                            lowValueMapper: (CandleData d, _) => d.low,
+                            highValueMapper: (CandleData d, _) => d.high,
+                            openValueMapper: (CandleData d, _) => d.open,
+                            closeValueMapper: (CandleData d, _) => d.close,
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
           ),
         ],
       ),

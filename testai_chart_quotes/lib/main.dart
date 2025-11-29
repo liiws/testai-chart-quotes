@@ -12,27 +12,44 @@ Future<List<Candle>> fetchForexCandles({int days = 50}) async {
       'https://www.alphavantage.co/query?function=FX_DAILY&from_symbol=$symbolFrom&to_symbol=$symbolTo&apikey=$apiKey');
   final response = await http.get(url);
   if (response.statusCode != 200) {
-    throw Exception('Failed to load quotes');
+    throw Exception('Failed to load quotes (status ${response.statusCode}).');
   }
   final Map<String, dynamic> data = jsonDecode(response.body);
+  if (data.containsKey('Error Message') || data.containsKey('Note') || data.containsKey('Information')) {
+    throw Exception((data['Error Message'] ?? data['Note'] ?? data['Information']).toString());
+  }
   final timeseries = data['Time Series FX (Daily)'];
   if (timeseries == null || timeseries is! Map) {
-    throw Exception('Malformed API response');
+    throw Exception('Malformed API response or invalid API key/usage.');
   }
 
   final candles = <Candle>[];
-  // Alpha Vantage returns as {newest:..., older:...}. We want ascending date.
   final sortedDates = (timeseries.keys.toList()..sort((a, b) => a.compareTo(b)));
   for (final dateStr in sortedDates.take(days)) {
     final entry = timeseries[dateStr];
-    candles.add(Candle(
-      date: DateTime.parse(dateStr),
-      open: double.parse(entry['1. open']),
-      high: double.parse(entry['2. high']),
-      low: double.parse(entry['3. low']),
-      close: double.parse(entry['4. close']),
-      volume: 0,
-    ));
+    try {
+      final open = double.parse(entry['1. open']);
+      final high = double.parse(entry['2. high']);
+      final low = double.parse(entry['3. low']);
+      final close = double.parse(entry['4. close']);
+      if ([open, high, low, close].any((val) =>
+          val.isNaN || val.isInfinite)) {
+        continue; // Skip invalid/NaN values
+      }
+      candles.add(Candle(
+        date: DateTime.parse(dateStr),
+        open: open,
+        high: high,
+        low: low,
+        close: close,
+        volume: 0,
+      ));
+    } catch (e) {
+      continue; // Robustly skip if parsing fails
+    }
+  }
+  if (candles.isEmpty) {
+    throw Exception('No valid price data returned. Check your API key or try again later.');
   }
   return candles;
 }

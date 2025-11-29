@@ -29,6 +29,39 @@ class CurrencyQuotesApp extends StatefulWidget {
 enum Timeframe { m1, m5, m30, h1, h4, d }
 
 class _CurrencyQuotesAppState extends State<CurrencyQuotesApp> {
+      bool _showSMA = true;
+      final TextEditingController _smaPeriodController = TextEditingController(text: '7');
+      String? _smaPeriodError;
+
+      int get _smaPeriod {
+        final v = int.tryParse(_smaPeriodController.text);
+        return (v != null && v > 0) ? v : 7;
+      }
+
+      void _validateSmaPeriod() {
+        final text = _smaPeriodController.text;
+        if (text.isEmpty) {
+          setState(() => _smaPeriodError = 'Enter period');
+        } else {
+          final value = int.tryParse(text);
+          if (value == null || value <= 0) {
+            setState(() => _smaPeriodError = 'Enter a positive integer');
+          } else {
+            setState(() => _smaPeriodError = null);
+          }
+        }
+      }
+
+      List<SmaData> _calculateSMA(List<CandleData> candles, int period) {
+        if (candles.length < period) return [];
+        final List<SmaData> sma = [];
+        for (int i = period - 1; i < candles.length; i++) {
+          final window = candles.sublist(i - period + 1, i + 1);
+          final avg = window.map((c) => c.close).reduce((a, b) => a + b) / period;
+          sma.add(SmaData(date: candles[i].date, value: avg));
+        }
+        return sma;
+      }
     String _tfLabel(Timeframe tf) {
       switch (tf) {
         case Timeframe.m1:
@@ -249,6 +282,36 @@ class _CurrencyQuotesAppState extends State<CurrencyQuotesApp> {
                   ),
                 ],
                 const SizedBox(width: 16),
+                // SMA Checkbox and Period
+                Row(
+                  children: [
+                    Checkbox(
+                      value: _showSMA,
+                      onChanged: (v) {
+                        setState(() => _showSMA = v ?? true);
+                      },
+                    ),
+                    const Text('Show Simple Moving Average'),
+                    const SizedBox(width: 8),
+                    const Text('Period:'),
+                    const SizedBox(width: 4),
+                    SizedBox(
+                      width: 50,
+                      child: TextField(
+                        controller: _smaPeriodController,
+                        enabled: _showSMA,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          border: const OutlineInputBorder(),
+                          errorText: _smaPeriodError,
+                          isDense: true,
+                        ),
+                        onChanged: (_) => _validateSmaPeriod(),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 16),
                 const Text('Days:'),
                 const SizedBox(width: 8),
                 SizedBox(
@@ -285,7 +348,7 @@ class _CurrencyQuotesAppState extends State<CurrencyQuotesApp> {
                     ? const Center(child: Text('No data loaded.'))
                     : SfCartesianChart(
                         primaryXAxis: DateTimeAxis(),
-                        series: <CandleSeries<CandleData, DateTime>>[
+                        series: <ChartSeries<dynamic, DateTime>>[
                           CandleSeries<CandleData, DateTime>(
                             dataSource: _candles,
                             xValueMapper: (CandleData d, _) => d.date,
@@ -294,6 +357,15 @@ class _CurrencyQuotesAppState extends State<CurrencyQuotesApp> {
                             openValueMapper: (CandleData d, _) => d.open,
                             closeValueMapper: (CandleData d, _) => d.close,
                           ),
+                          if (_showSMA && _smaPeriodError == null && _candles.length >= _smaPeriod)
+                            LineSeries<SmaData, DateTime>(
+                              dataSource: _calculateSMA(_candles, _smaPeriod),
+                              xValueMapper: (SmaData d, _) => d.date,
+                              yValueMapper: (SmaData d, _) => d.value,
+                              color: Colors.orange,
+                              width: 2,
+                              name: 'SMA',
+                            ),
                         ],
                       ),
                 if (_loading)
@@ -306,6 +378,11 @@ class _CurrencyQuotesAppState extends State<CurrencyQuotesApp> {
               ],
             ),
           ),
+        class SmaData {
+          final DateTime date;
+          final double value;
+          SmaData({required this.date, required this.value});
+        }
         ],
       ),
     );

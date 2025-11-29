@@ -384,6 +384,7 @@ class _CurrencyQuotesAppState extends State<CurrencyQuotesApp> {
   }
 }
 
+
 class CandleData {
   final DateTime date;
   final double open;
@@ -391,4 +392,10 @@ class CandleData {
   final double low;
   final double close;
   CandleData({required this.date, required this.open, required this.high, required this.low, required this.close});
+}
+
+class SmaData {
+  final DateTime date;
+  final double value;
+  SmaData({required this.date, required this.value});
 }

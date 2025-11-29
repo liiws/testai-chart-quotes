@@ -66,9 +66,17 @@ class _CurrencyQuotesAppState extends State<CurrencyQuotesApp> {
           setState(() {
             _error = data['Error Message'];
           });
+        } else if (data.containsKey('Note')) {
+          setState(() {
+            _error = data['Note'];
+          });
+        } else if (data.containsKey('Information')) {
+          setState(() {
+            _error = data['Information'];
+          });
         } else {
           setState(() {
-            _error = 'Unexpected response format.';
+            _error = 'Unexpected response format: \n${response.body}';
           });
         }
       } else {

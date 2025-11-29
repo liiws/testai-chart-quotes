@@ -154,49 +154,41 @@ class CandlestickChartWidget extends StatelessWidget {
     }
     return Padding(
       padding: const EdgeInsets.all(8.0),
-      child: BarChart(
-        BarChartData(
-          alignment: BarChartAlignment.spaceBetween,
-          gridData: FlGridData(show: true),
-          titlesData: FlTitlesData(
-            leftTitles: AxisTitles(
-              sideTitles: SideTitles(showTitles: true, reservedSize: 40),
-            ),
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                interval: 5,
-                getTitlesWidget: (value, meta) {
-                  int idx = value.toInt();
-                  if (idx >= 0 && idx < candles.length && (idx % 5 == 0 || idx == candles.length - 1)) {
-                    return Text(candles[idx].date.substring(5), style: const TextStyle(fontSize: 10));
-                  }
-                  return const SizedBox.shrink();
-                },
-              ),
-            ),
-          ),
-          borderData: FlBorderData(show: true),
-          barGroups: [
-            for (int i = 0; i < candles.length; i++)
-              BarChartGroupData(
-                x: i,
-                barRods: [
-                  BarChartRodData(
-                    toY: candles[i].high,
-                    fromY: candles[i].low,
-                    color: candles[i].close >= candles[i].open ? Colors.green : Colors.red,
-                    width: 7,
-                    borderRadius: BorderRadius.zero,
-                    rodStackItems: [
-                      BarChartRodStackItem(candles[i].open, candles[i].close, candles[i].close >= candles[i].open ? Colors.green : Colors.red),
-                    ],
-                  )
+            child: CandlestickChart(
+              CandlestickChartData(
+                candleData: [
+                  for (int i = 0; i < candles.length; i++)
+                    CandleStickData(
+                      x: i,
+                      shadowHigh: candles[i].high,
+                      shadowLow: candles[i].low,
+                      open: candles[i].open,
+                      close: candles[i].close,
+                      bullColor: Colors.green,
+                      bearColor: Colors.red,
+                    )
                 ],
+                gridData: FlGridData(show: true),
+                borderData: FlBorderData(show: true),
+                titlesData: FlTitlesData(
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(showTitles: true, reservedSize: 40),
+                  ),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      interval: 5,
+                      getTitlesWidget: (value, meta) {
+                        int idx = value.toInt();
+                        if (idx >= 0 && idx < candles.length && (idx % 5 == 0 || idx == candles.length - 1)) {
+                          return Text(candles[idx].date.substring(5), style: const TextStyle(fontSize: 10));
+                        }
+                        return const SizedBox.shrink();
+                      },
+                    ),
+                  ),
+                ),
               ),
-          ],
-        ),
-      ),
     );
   }
 }

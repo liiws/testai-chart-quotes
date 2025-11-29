@@ -5,11 +5,11 @@ import 'package:candlesticks/candlesticks.dart';
 
 // Fetches candles from Alpha Vantage FX_DAILY API, returning List<Candle> from candlesticks package
 Future<List<Candle>> fetchForexCandles({int days = 50}) async {
-  const apiKey = 'YOUR_ALPHA_VANTAGE_API_KEY'; // Replace with your API key
+  const apiKey = 'demo'; // Replace with your API key
   const symbolFrom = 'EUR';
   const symbolTo = 'USD';
   final url = Uri.parse(
-      'https://www.alphavantage.co/query?function=FX_DAILY&from_symbol=$symbolFrom&to_symbol=$symbolTo&outputsize=compact&apikey=$apiKey');
+      'https://www.alphavantage.co/query?function=FX_DAILY&from_symbol=$symbolFrom&to_symbol=$symbolTo&apikey=$apiKey');
   final response = await http.get(url);
   if (response.statusCode != 200) {
     throw Exception('Failed to load quotes');

@@ -42,7 +42,7 @@ class _QuotesHomePageState extends State<QuotesHomePage> {
     final days = int.tryParse(_daysController.text) ?? 50;
     final apiKey = "demo"; // Replace with your Alpha Vantage API key
     final url = Uri.parse(
-        'https://www.alphavantage.co/query?function=FX_DAILY&from_symbol=EUR&to_symbol=USD&outputsize=compact&apikey=$apiKey');
+        'https://www.alphavantage.co/query?function=FX_DAILY&from_symbol=EUR&to_symbol=USD&apikey=$apiKey');
     try {
       final response = await http.get(url);
       if (response.statusCode == 200) {

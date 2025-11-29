@@ -183,21 +183,21 @@ class CandlestickChartWidget extends StatelessWidget {
                 x: i,
                 barsSpace: 0,
                 barRods: [
-                  // Candle wick
-                  BarChartRodData(
-                    toY: candles[i].high,
-                    fromY: candles[i].low,
-                    width: 2,
-                    color: Colors.grey[700],
-                    borderRadius: BorderRadius.zero,
-                  ),
-                  // Candle body
+                  // Candle body (wider, painted first, in the back)
                   BarChartRodData(
                     toY: candles[i].open > candles[i].close ? candles[i].open : candles[i].close,
                     fromY: candles[i].open > candles[i].close ? candles[i].close : candles[i].open,
                     width: 10,
                     color: candles[i].close >= candles[i].open ? Colors.green : Colors.red,
                     borderRadius: BorderRadius.circular(0),
+                  ),
+                  // Candle wick (drawn after body, thinner, on top to center it visually)
+                  BarChartRodData(
+                    toY: candles[i].high,
+                    fromY: candles[i].low,
+                    width: 2,
+                    color: Colors.grey[700],
+                    borderRadius: BorderRadius.zero,
                   ),
                 ],
               ),

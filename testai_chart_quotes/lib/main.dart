@@ -29,6 +29,22 @@ class CurrencyQuotesApp extends StatefulWidget {
 enum Timeframe { m1, m5, m30, h1, h4, d }
 
 class _CurrencyQuotesAppState extends State<CurrencyQuotesApp> {
+    String _tfLabel(Timeframe tf) {
+      switch (tf) {
+        case Timeframe.m1:
+          return 'M1';
+        case Timeframe.m5:
+          return 'M5';
+        case Timeframe.m30:
+          return 'M30';
+        case Timeframe.h1:
+          return 'H1';
+        case Timeframe.h4:
+          return 'H4';
+        case Timeframe.d:
+          return 'D';
+      }
+    }
   Timeframe _currentTimeframe = Timeframe.d;
   String? _daysError;
 
@@ -293,22 +309,6 @@ class _CurrencyQuotesAppState extends State<CurrencyQuotesApp> {
         ],
       ),
     );
-    String _tfLabel(Timeframe tf) {
-      switch (tf) {
-        case Timeframe.m1:
-          return 'M1';
-        case Timeframe.m5:
-          return 'M5';
-        case Timeframe.m30:
-          return 'M30';
-        case Timeframe.h1:
-          return 'H1';
-        case Timeframe.h4:
-          return 'H4';
-        case Timeframe.d:
-          return 'D';
-      }
-    }
   }
 }
 

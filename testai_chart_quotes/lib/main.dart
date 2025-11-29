@@ -154,11 +154,17 @@ class _QuotesHomePageState extends State<QuotesHomePage> {
             ),
           ),
           Expanded(
-            child: (_candles.length < 2)
-                ? const Center(child: Text('No chartable data.'))
-                : Candlesticks(
-                    candles: _candles,
-                  ),
+            child: (() {
+              if (_candles.length < 2) {
+                return const Center(child: Text('No chartable data.'));
+              }
+              // Check for at least 2 distinct price values
+              final allPrices = _candles.expand((c) => [c.open, c.high, c.low, c.close]).toSet();
+              if (allPrices.length < 2) {
+                return const Center(child: Text('Not enough price variation for chart.'));
+              }
+              return Candlesticks(candles: _candles);
+            })(),
           ),
         ],
       ),

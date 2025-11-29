@@ -152,21 +152,32 @@ class _CurrencyQuotesAppState extends State<CurrencyQuotesApp> {
             ),
           ),
           Expanded(
-            child: _candles.isEmpty
-                ? const Center(child: Text('No data loaded.'))
-                : SfCartesianChart(
-                    primaryXAxis: DateTimeAxis(),
-                    series: <CandleSeries<CandleData, DateTime>>[
-                      CandleSeries<CandleData, DateTime>(
-                        dataSource: _candles,
-                        xValueMapper: (CandleData d, _) => d.date,
-                        lowValueMapper: (CandleData d, _) => d.low,
-                        highValueMapper: (CandleData d, _) => d.high,
-                        openValueMapper: (CandleData d, _) => d.open,
-                        closeValueMapper: (CandleData d, _) => d.close,
+            child: Stack(
+              children: [
+                _candles.isEmpty
+                    ? const Center(child: Text('No data loaded.'))
+                    : SfCartesianChart(
+                        primaryXAxis: DateTimeAxis(),
+                        series: <CandleSeries<CandleData, DateTime>>[
+                          CandleSeries<CandleData, DateTime>(
+                            dataSource: _candles,
+                            xValueMapper: (CandleData d, _) => d.date,
+                            lowValueMapper: (CandleData d, _) => d.low,
+                            highValueMapper: (CandleData d, _) => d.high,
+                            openValueMapper: (CandleData d, _) => d.open,
+                            closeValueMapper: (CandleData d, _) => d.close,
+                          ),
+                        ],
                       ),
-                    ],
+                if (_loading)
+                  Container(
+                    color: Colors.black.withOpacity(0.2),
+                    child: const Center(
+                      child: CircularProgressIndicator(),
+                    ),
                   ),
+              ],
+            ),
           ),
         ],
       ),

@@ -348,7 +348,7 @@ class _CurrencyQuotesAppState extends State<CurrencyQuotesApp> {
                     ? const Center(child: Text('No data loaded.'))
                     : SfCartesianChart(
                         primaryXAxis: DateTimeAxis(),
-                        series: <ChartSeries<dynamic, DateTime>>[
+                        series: <CartesianSeries<dynamic, dynamic>>[
                           CandleSeries<CandleData, DateTime>(
                             dataSource: _candles,
                             xValueMapper: (CandleData d, _) => d.date,

@@ -26,11 +26,26 @@ class CurrencyQuotesApp extends StatefulWidget {
   State<CurrencyQuotesApp> createState() => _CurrencyQuotesAppState();
 }
 
+enum Period { m1, m5, m30, h1, h4, d }
+
 class _CurrencyQuotesAppState extends State<CurrencyQuotesApp> {
   final TextEditingController _daysController = TextEditingController(text: '50');
   List<CandleData> _candles = [];
   bool _loading = false;
   String? _error;
+  Period _period = Period.d; // default to daily
+
+  static const periodLabels = {
+    Period.m1: 'M1', Period.m5: 'M5', Period.m30: 'M30', Period.h1: 'H1', Period.h4: 'H4', Period.d: 'D',
+  };
+
+  static const periodInterval = {
+    Period.m1: '1min',
+    Period.m5: '5min',
+    Period.m30: '30min',
+    Period.h1: '60min',
+    Period.h4: '240min',
+  };
 
   Future<void> _logError(String message) async {
     final logFile = File('error_log.txt');
@@ -52,14 +67,23 @@ class _CurrencyQuotesAppState extends State<CurrencyQuotesApp> {
       _error = null;
     });
 
-    const apiKey = 'demo'; // Replace with your Alpha Vantage API Key
-    final url = 'https://www.alphavantage.co/query?function=FX_DAILY&from_symbol=EUR&to_symbol=USD&apikey=demo';
+    const apiKey = 'demo';
+    String url;
+    if (_period == Period.d) {
+      url = 'https://www.alphavantage.co/query?function=FX_DAILY&from_symbol=EUR&to_symbol=USD&apikey=demo';
+    } else {
+      final interval = periodInterval[_period]!;
+      url = 'https://www.alphavantage.co/query?function=FX_INTRADAY&from_symbol=EUR&to_symbol=USD&interval=$interval&outputsize=full&apikey=demo';
+    }
     try {
       final response = await http.get(Uri.parse(url));
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = json.decode(response.body);
-        if (data.containsKey('Time Series FX (Daily)')) {
-          final series = data['Time Series FX (Daily)'] as Map<String, dynamic>;
+        final String? seriesKey = _period == Period.d
+          ? 'Time Series FX (Daily)'
+          : data.keys.firstWhere((k) => k.contains('Time Series FX (Intraday)'), orElse: () => '');
+        if (seriesKey != null && data.containsKey(seriesKey)) {
+          final series = data[seriesKey] as Map<String, dynamic>;
           final sortedDates = series.keys.toList()..sort((a, b) => b.compareTo(a));
           final candles = <CandleData>[];
           for (final date in sortedDates.take(days)) {
@@ -73,7 +97,7 @@ class _CurrencyQuotesAppState extends State<CurrencyQuotesApp> {
             ));
           }
           setState(() {
-            _candles = candles.reversed.toList(); // Oldest to latest
+            _candles = candles.reversed.toList();
           });
         } else if (data.containsKey('Error Message')) {
           await _logError('Error Message: ' + data['Error Message']);
@@ -120,6 +144,33 @@ class _CurrencyQuotesAppState extends State<CurrencyQuotesApp> {
       appBar: AppBar(title: const Text('EUR/USD Currency Quotes')),
       body: Column(
         children: [
+          // Timeframe buttons bar
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: Period.values.map((p) {
+                final selected = p == _period;
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 3.0),
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: selected ? Theme.of(context).colorScheme.primary : null,
+                      foregroundColor: selected ? Colors.white : null,
+                      elevation: selected ? 2 : 0,
+                    ),
+                    onPressed: selected || _loading
+                        ? null
+                        : () async {
+                            setState(() { _period = p; });
+                            await _fetchCandles();
+                          },
+                    child: Text(periodLabels[p]!),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: Row(

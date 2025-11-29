@@ -58,7 +58,8 @@ class _QuotesHomePageState extends State<QuotesHomePage> {
         }
         final entries = timeSeries.entries.toList()
           ..sort((a, b) => a.key.compareTo(b.key)); // oldest to newest
-        final lastEntries = entries.takeLast(days).toList();
+        final clampedDays = days.clamp(1, entries.length);
+        final lastEntries = entries.takeLast(clampedDays).toList();
         final candles = lastEntries.map((entry) {
           final date = DateTime.parse(entry.key);
           final values = entry.value as Map<String, dynamic>;

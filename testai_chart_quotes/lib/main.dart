@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:io';
 
 void main() {
   runApp(const MainApp());
@@ -26,6 +27,17 @@ class CurrencyQuotesApp extends StatefulWidget {
 }
 
 class _CurrencyQuotesAppState extends State<CurrencyQuotesApp> {
+
+    Future<void> _logError(String message) async {
+      final now = DateTime.now().toIso8601String();
+      final logLine = '[$now] $message\n';
+      try {
+        final file = File('error_log.txt');
+        await file.writeAsString(logLine, mode: FileMode.append, flush: true);
+      } catch (e) {
+        // Ignore logging errors
+      }
+    }
   final TextEditingController _daysController = TextEditingController(text: '50');
   List<CandleData> _candles = [];
   bool _loading = false;
@@ -50,41 +62,51 @@ class _CurrencyQuotesAppState extends State<CurrencyQuotesApp> {
           final sortedDates = series.keys.toList()..sort((a, b) => b.compareTo(a));
           final candles = <CandleData>[];
           for (final date in sortedDates.take(days)) {
-            final candle = series[date];
-            candles.add(CandleData(
-              date: DateTime.parse(date),
-              open: double.parse(candle['1. open']),
-              high: double.parse(candle['2. high']),
-              low: double.parse(candle['3. low']),
-              close: double.parse(candle['4. close']),
-            ));
+            try {
+              final candle = series[date];
+              candles.add(CandleData(
+                date: DateTime.parse(date),
+                open: double.parse(candle['1. open']),
+                high: double.parse(candle['2. high']),
+                low: double.parse(candle['3. low']),
+                close: double.parse(candle['4. close']),
+              ));
+            } catch (e) {
+              await _logError('Parse error for date $date: $e, data: ${series[date]}');
+            }
           }
           setState(() {
             _candles = candles.reversed.toList(); // Oldest to latest
           });
         } else if (data.containsKey('Error Message')) {
+          await _logError('API Error Message: ${data['Error Message']}');
           setState(() {
             _error = data['Error Message'];
           });
         } else if (data.containsKey('Note')) {
+          await _logError('API Note: ${data['Note']}');
           setState(() {
             _error = data['Note'];
           });
         } else if (data.containsKey('Information')) {
+          await _logError('API Information: ${data['Information']}');
           setState(() {
             _error = data['Information'];
           });
         } else {
+          await _logError('Unexpected response format: ${response.body}');
           setState(() {
             _error = 'Unexpected response format: \n${response.body}';
           });
         }
       } else {
+        await _logError('HTTP error: ${response.statusCode}, body: ${response.body}');
         setState(() {
           _error = 'Error: ${response.statusCode}';
         });
       }
-    } catch (e) {
+    } catch (e, st) {
+      await _logError('Exception: $e\nStack: $st');
       setState(() {
         _error = 'Failed to fetch data: $e';
       });

@@ -158,9 +158,14 @@ class _QuotesHomePageState extends State<QuotesHomePage> {
               if (_candles.length < 2) {
                 return const Center(child: Text('No chartable data.'));
               }
-              // Check for at least 2 distinct price values
-              final allPrices = _candles.expand((c) => [c.open, c.high, c.low, c.close]).toSet();
-              if (allPrices.length < 2) {
+              final allPrices = _candles.expand((c) => [c.open, c.high, c.low, c.close]).toList();
+              if (allPrices.any((v) => !v.isFinite)) {
+                return const Center(child: Text('Invalid price data.'));
+              }
+              final minPrice = allPrices.reduce((a, b) => a < b ? a : b);
+              final maxPrice = allPrices.reduce((a, b) => a > b ? a : b);
+              final priceRange = maxPrice - minPrice;
+              if (!priceRange.isFinite || priceRange == 0) {
                 return const Center(child: Text('Not enough price variation for chart.'));
               }
               return Candlesticks(candles: _candles);

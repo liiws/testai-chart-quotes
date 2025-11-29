@@ -200,4 +200,3 @@ class CandlestickChartWidget extends StatelessWidget {
     );
   }
 }
-}

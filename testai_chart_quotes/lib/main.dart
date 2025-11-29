@@ -60,18 +60,26 @@ class _QuotesHomePageState extends State<QuotesHomePage> {
           ..sort((a, b) => a.key.compareTo(b.key)); // oldest to newest
         final clampedDays = days.clamp(1, entries.length);
         final lastEntries = entries.takeLast(clampedDays).toList();
-        final candles = lastEntries.map((entry) {
+        final candles = <Candle>[];
+        for (final entry in lastEntries) {
           final date = DateTime.parse(entry.key);
           final values = entry.value as Map<String, dynamic>;
-          return Candle(
+          double? open = double.tryParse(values['1. open']);
+          double? high = double.tryParse(values['2. high']);
+          double? low = double.tryParse(values['3. low']);
+          double? close = double.tryParse(values['4. close']);
+          if ([open, high, low, close].any((v) => v == null || v.isNaN || v.isInfinite)) {
+            continue; // skip invalid candle
+          }
+          candles.add(Candle(
             date: date,
-            open: double.parse(values['1. open']),
-            high: double.parse(values['2. high']),
-            low: double.parse(values['3. low']),
-            close: double.parse(values['4. close']),
+            open: open!,
+            high: high!,
+            low: low!,
+            close: close!,
             volume: 0,
-          );
-        }).toList();
+          ));
+        }
         setState(() {
           _candles = candles;
           _loading = false;

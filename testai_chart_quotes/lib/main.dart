@@ -49,6 +49,74 @@ class _QuotesHomePageState extends State<QuotesHomePage> {
   List<Candle> _candles = [];
   bool _isLoading = false;
 
+  // timeframes: id as AlphaVantage param, txt as button label, avFn as the query function
+  static const _timeframeButtons = [
+    {"id": "M1", "txt": "M1"},
+    {"id": "M5", "txt": "M5"},
+    {"id": "M30", "txt": "M30"},
+    {"id": "H1", "txt": "H1"},
+    {"id": "H4", "txt": "H4"},
+    {"id": "D", "txt": "D"},
+  ];
+
+  String _currentTf = "D";
+
+  void _onTimeframePressed(String tf) async {
+    setState(() => _currentTf = tf);
+    String input = _daysController.text.trim();
+    int? days = int.tryParse(input);
+    if (days == null || days < 1 || days > 200) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Enter a valid number of days (1-200).")),
+      );
+      return;
+    }
+    await _loadQuotes(days, tf);
+  }
+
+  Future<void> _loadQuotes(int days, String tf) async {
+    setState(() {
+      _isLoading = true;
+    });
+    try {
+      final apiKey = "demo"; // <-- SET YOUR ALPHA VANTAGE API KEY HERE
+      final url = _alphaVantageUrl(tf, apiKey);
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final data = response.body;
+        try {
+          final candles = _parseAlphaVantageToCandles(data, days, tf);
+          print("PARSED ${candles.length} CANDLES:");
+          for (var c in candles) {
+            print("Candle: date=${c.date}, o=${c.open}, h=${c.high}, l=${c.low}, c=${c.close}");
+          }
+          setState(() {
+            _candles = candles.isEmpty ? [] : candles;
+          });
+        } catch (e, st) {
+          await logError("Parse error: $e\n$st\n$data");
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Error parsing quotes data.")),
+          );
+        }
+      } else {
+        final errorMsg = "HTTP error: ${response.statusCode}\n${response.body}";
+        await logError(errorMsg);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Failed to fetch data (network error).")),
+        );
+      }
+    } catch (e, st) {
+      await logError("Exception: $e\n$st");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Network or logic error (see log.txt)")),
+      );
+    }
+    setState(() {
+      _isLoading = false;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -62,6 +130,19 @@ class _QuotesHomePageState extends State<QuotesHomePage> {
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: Row(
               children: [
+                for (final tf in _timeframeButtons)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                    child: OutlinedButton(
+                      onPressed: _isLoading || _currentTf == tf['id'] ? null : () => _onTimeframePressed(tf['id']!),
+                      style: OutlinedButton.styleFrom(
+                        backgroundColor: _currentTf == tf['id'] ? Colors.blue : null,
+                        foregroundColor: _currentTf == tf['id'] ? Colors.white : null,
+                      ),
+                      child: Text(tf['txt']!),
+                    ),
+                  ),
+                const SizedBox(width: 8),
                 Expanded(
                   child: TextField(
                     controller: _daysController,
@@ -88,48 +169,7 @@ class _QuotesHomePageState extends State<QuotesHomePage> {
                             );
                             return;
                           }
-                          setState(() {
-                            _isLoading = true;
-                          });
-
-                          try {
-                            final apiKey = "demo"; // <-- SET YOUR ALPHA VANTAGE API KEY HERE
-                            final url =
-                                "https://www.alphavantage.co/query?function=FX_DAILY&from_symbol=EUR&to_symbol=USD&apikey=$apiKey";
-                            final response = await http.get(Uri.parse(url));
-                            if (response.statusCode == 200) {
-                                final data = response.body;
-                                try {
-                                  final candles = _parseAlphaVantageToCandles(data, days);
-                                  print("PARSED ${candles.length} CANDLES:");
-                                  for (var c in candles) {
-                                    print("Candle: date=${c.date}, o=${c.open}, h=${c.high}, l=${c.low}, c=${c.close}");
-                                  }
-                                  setState(() {
-                                    _candles = candles.isEmpty ? [] : candles;
-                                  });
-                                } catch (e, st) {
-                                  await logError("Parse error: $e\n$st\n$data");
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text("Error parsing quotes data.")),
-                                  );
-                                }
-                              } else {
-                                final errorMsg = "HTTP error: ${response.statusCode}\n${response.body}";
-                                await logError(errorMsg);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text("Failed to fetch data (network error).")),
-                                );
-                              }
-                            } catch (e, st) {
-                              await logError("Exception: $e\n$st");
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text("Network or logic error (see log.txt)")),
-                              );
-                            }
-                            setState(() {
-                              _isLoading = false;
-                            });
+                          await _loadQuotes(days, _currentTf);
                         },
                   child: _isLoading
                       ? Row(
@@ -171,25 +211,32 @@ class _QuotesHomePageState extends State<QuotesHomePage> {
     );
   }
 
-  List<Candle> _parseAlphaVantageToCandles(String jsonString, int days) {
+  List<Candle> _parseAlphaVantageToCandles(String jsonString, int days, String tf) {
     try {
       final Map<String, dynamic> decoded = Map<String, dynamic>.from(
           (jsonDecode(jsonString) as Map<dynamic, dynamic>));
+      String k;
+      if (tf == "D") {
+        k = "Time Series FX (Daily)";
+      } else if (tf == "H4" || tf == "H1" || tf == "M30" || tf == "M5" || tf == "M1") {
+        k = "Time Series FX (${_tfAlphaVantage(tf)})";
+      } else {
+        k = "Time Series FX (Daily)";
+      }
       final timeSeries =
-          decoded["Time Series FX (Daily)"] as Map<String, dynamic>?;
+          decoded[k] as Map<String, dynamic>?;
       if (timeSeries == null) return [];
       final sortedDates = timeSeries.keys.toList()
         ..sort((a, b) => b.compareTo(a)); // sort descending (newest first)
       final List<Candle> candles = [];
       for (int i = 0; i < sortedDates.length && candles.length < days; i++) {
-        final dayData = timeSeries[sortedDates[i]];
+        final item = timeSeries[sortedDates[i]];
         try {
-          final open = double.parse(dayData["1. open"]);
-          final high = double.parse(dayData["2. high"]);
-          final low = double.parse(dayData["3. low"]);
-          final close = double.parse(dayData["4. close"]);
+          final open = double.parse(item["1. open"]);
+          final high = double.parse(item["2. high"]);
+          final low = double.parse(item["3. low"]);
+          final close = double.parse(item["4. close"]);
           if ([open, high, low, close].any((v) => !v.isFinite)) {
-            // skip broken points
             continue;
           }
           candles.add(
@@ -202,13 +249,39 @@ class _QuotesHomePageState extends State<QuotesHomePage> {
             ),
           );
         } catch (_) {
-          // skip if data missing or non-numeric
           continue;
         }
       }
-      return candles.reversed.toList(); // so chart is oldest left, latest right
+      return candles.reversed.toList();
     } catch (_) {
       return [];
+    }
+  }
+
+  String _alphaVantageUrl(String tf, String apiKey) {
+    if (tf == "D") {
+      return "https://www.alphavantage.co/query?function=FX_DAILY&from_symbol=EUR&to_symbol=USD&apikey=$apiKey";
+    } else {
+      // intraday: 1min, 5min, 30min, 60min ("M1","M5","M30","H1") => requires FX_INTRADAY API
+      final interval = _tfAlphaVantage(tf);
+      return "https://www.alphavantage.co/query?function=FX_INTRADAY&from_symbol=EUR&to_symbol=USD&interval=$interval&apikey=$apiKey";
+    }
+  }
+
+  String _tfAlphaVantage(String tf) {
+    switch (tf) {
+      case "M1":
+        return "1min";
+      case "M5":
+        return "5min";
+      case "M30":
+        return "30min";
+      case "H1":
+        return "60min";
+      case "H4":
+        return "4min"; // not officially supported, can fallback to "60min"
+      default:
+        return "1min";
     }
   }
 }

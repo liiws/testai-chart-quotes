@@ -123,16 +123,29 @@ class _QuotesHomePageState extends State<QuotesHomePage> {
       final List<Candle> candles = [];
       for (int i = 0; i < sortedDates.length && candles.length < days; i++) {
         final dayData = timeSeries[sortedDates[i]];
-        candles.add(
-          Candle(
-            date: DateTime.parse(sortedDates[i]),
-            open: double.parse(dayData["1. open"]),
-            high: double.parse(dayData["2. high"]),
-            low: double.parse(dayData["3. low"]),
-            close: double.parse(dayData["4. close"]),
-            volume: 0,
-          ),
-        );
+        try {
+          final open = double.parse(dayData["1. open"]);
+          final high = double.parse(dayData["2. high"]);
+          final low = double.parse(dayData["3. low"]);
+          final close = double.parse(dayData["4. close"]);
+          if ([open, high, low, close].any((v) => !v.isFinite)) {
+            // skip broken points
+            continue;
+          }
+          candles.add(
+            Candle(
+              date: DateTime.parse(sortedDates[i]),
+              open: open,
+              high: high,
+              low: low,
+              close: close,
+              volume: 0,
+            ),
+          );
+        } catch (_) {
+          // skip if data missing or non-numeric
+          continue;
+        }
       }
       return candles.reversed.toList(); // so chart is oldest left, latest right
     } catch (_) {

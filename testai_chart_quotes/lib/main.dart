@@ -65,9 +65,9 @@ class _QuotesHomePageState extends State<QuotesHomePage> {
                           });
 
                           try {
-                            final apiKey = ""; // <-- SET YOUR ALPHA VANTAGE API KEY HERE
+                            final apiKey = "demo"; // <-- SET YOUR ALPHA VANTAGE API KEY HERE
                             final url =
-                                "https://www.alphavantage.co/query?function=FX_DAILY&from_symbol=EUR&to_symbol=USD&apikey=$apiKey&outputsize=compact";
+                                "https://www.alphavantage.co/query?function=FX_DAILY&from_symbol=EUR&to_symbol=USD&apikey=$apiKey";
                             final response = await http.get(Uri.parse(url));
                             if (response.statusCode == 200) {
                                 final data = response.body;

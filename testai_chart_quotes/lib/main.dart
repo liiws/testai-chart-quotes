@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -18,6 +19,21 @@ class CandleData {
     required this.open,
     required this.close,
   });
+}
+
+Future<void> _log(String message) async {
+  try {
+    final logDir = Directory('logs');
+    await logDir.create(recursive: true);
+    final logFile = File('${logDir.path}/app.log');
+    final timestamp = DateTime.now().toIso8601String();
+    await logFile.writeAsString(
+      '$timestamp: $message\n',
+      mode: FileMode.append,
+    );
+  } catch (e) {
+    debugPrint('Logger failed: $e');
+  }
 }
 
 class MainApp extends StatefulWidget {
@@ -41,53 +57,87 @@ class _MainAppState extends State<MainApp> {
   }
 
   Future<void> _refresh() async {
+    await _log('Refresh started with days: ${_daysController.text}');
+
     setState(() {
       _isLoading = true;
       _candles = [];
     });
 
+    String? errorMsg;
     try {
       final days = int.tryParse(_daysController.text) ?? 50;
+      if (days > 365 || days < 1) {
+        errorMsg = 'Days must be between 1 and 365';
+        throw Exception(errorMsg);
+      }
+
       // Replace 'demo' with your Alpha Vantage API key
-      final response = await http.get(
-        Uri.parse(
-          'https://www.alphavantage.co/query?function=FX_DAILY&from_symbol=EUR&to_symbol=USD&apikey=demo',
-        ),
-      );
+      final response = await http
+          .get(
+            Uri.parse(
+              'https://www.alphavantage.co/query?function=FX_DAILY&from_symbol=EUR&to_symbol=USD&apikey=demo',
+            ),
+          )
+          .timeout(const Duration(seconds: 30));
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body) as Map<String, dynamic>;
-        final timeSeries =
-            data['Time Series FX (Daily)'] as Map<String, dynamic>?;
+      await _log('API response status: ${response.statusCode}');
 
-        if (timeSeries != null) {
-          final List<CandleData> candles = [];
-          final entries = timeSeries.entries.take(days);
-          for (final entry in entries) {
-            final values = entry.value as Map<String, dynamic>;
-            final date = DateTime.parse(entry.key);
-            candles.add(
-              CandleData(
-                date: date,
-                open: double.parse(values['1. open']!),
-                high: double.parse(values['2. high']!),
-                low: double.parse(values['3. low']!),
-                close: double.parse(values['4. close']!),
-              ),
-            );
-          }
-          candles.sort((a, b) => a.date.compareTo(b.date));
-          setState(() {
-            _candles = candles;
-          });
+      if (response.statusCode != 200) {
+        errorMsg = 'HTTP ${response.statusCode}';
+        throw HttpException(errorMsg);
+      }
+
+      final data = json.decode(response.body) as Map<String, dynamic>;
+
+      if (data['Error Message'] != null) {
+        errorMsg = data['Error Message'];
+        throw Exception('API Error: $errorMsg');
+      }
+      if (data['Note'] != null) {
+        errorMsg = data['Note'];
+        throw Exception('API Note: $errorMsg');
+      }
+
+      final timeSeries =
+          data['Time Series FX (Daily)'] as Map<String, dynamic>?;
+
+      if (timeSeries == null || timeSeries.isEmpty) {
+        errorMsg = 'No time series data found';
+        throw Exception(errorMsg);
+      }
+
+      final List<CandleData> candles = [];
+      final entries = timeSeries.entries.take(days);
+      for (final entry in entries) {
+        try {
+          final values = entry.value as Map<String, dynamic>;
+          final date = DateTime.parse(entry.key);
+          candles.add(
+            CandleData(
+              date: date,
+              open: double.parse(values['1. open']!),
+              high: double.parse(values['2. high']!),
+              low: double.parse(values['3. low']!),
+              close: double.parse(values['4. close']!),
+            ),
+          );
+        } catch (parseErr) {
+          await _log('Parse error for ${entry.key}: $parseErr');
         }
       }
+      candles.sort((a, b) => a.date.compareTo(b.date));
+      await _log('Loaded ${candles.length} candles');
+      setState(() {
+        _candles = candles;
+      });
     } catch (e) {
-      // Handle error (e.g., show snackbar)
+      errorMsg ??= e.toString();
+      await _log('Refresh error: $errorMsg');
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error loading data: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(errorMsg!), backgroundColor: Colors.red),
+        );
       }
     } finally {
       if (mounted) {

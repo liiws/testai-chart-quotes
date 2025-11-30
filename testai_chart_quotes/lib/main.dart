@@ -207,25 +207,32 @@ class CandlestickChartPainterWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Render candlesticks using fl_chart
-    // x axis: index or date; y axis: price
     final minY = candles.map((c) => c.low).reduce((a, b) => a < b ? a : b);
     final maxY = candles.map((c) => c.high).reduce((a, b) => a > b ? a : b);
-    return CandleStickChart(
-      CandleStickChartData(
-        candleData: [
-          for (int i = 0; i < candles.length; i++)
-            CandleStickChartItem(
-              x: i.toDouble(),
-              open: candles[i].open,
-              high: candles[i].high,
-              low: candles[i].low,
-              close: candles[i].close,
-            ),
-        ],
+    return BarChart(
+      BarChartData(
+        barGroups: List.generate(candles.length, (i) {
+          final c = candles[i];
+          final isBull = c.close >= c.open;
+          // The single bar: open and close
+          return BarChartGroupData(
+            x: i,
+            barRods: [
+              BarChartRodData(
+                toY: c.open,
+                fromY: c.close,
+                width: 8,
+                color: isBull ? Colors.green : Colors.red,
+                borderRadius: BorderRadius.zero,
+              ),
+            ],
+            showingTooltipIndicators: [],
+            barsSpace: 2,
+          );
+        }),
         minY: minY,
         maxY: maxY,
-        gridData: const FlGridData(show: true),
+        gridData: FlGridData(show: true),
         borderData: FlBorderData(show: true),
         titlesData: FlTitlesData(
           leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true)),
@@ -234,11 +241,11 @@ class CandlestickChartPainterWidget extends StatelessWidget {
           bottomTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
-              getTitlesWidget: (value, meta) {
-                final idx = value.round();
+              // Label each 10th bar (date short)
+              getTitlesWidget: (double value, TitleMeta meta) {
+                final idx = value.toInt();
                 if (idx < 0 || idx >= candles.length) return const SizedBox();
                 final dt = candles[idx].date;
-                // Show every 10th tick to reduce clutter
                 if (idx % 10 == 0 || idx == candles.length - 1) {
                   return Text('${dt.month}/${dt.day}');
                 }
@@ -247,6 +254,7 @@ class CandlestickChartPainterWidget extends StatelessWidget {
             ),
           ),
         ),
+        barTouchData: BarTouchData(enabled: false),
       ),
     );
   }

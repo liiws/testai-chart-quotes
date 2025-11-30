@@ -44,6 +44,7 @@ class MainApp extends StatefulWidget {
 }
 
 class _MainAppState extends State<MainApp> {
+  final _formKey = GlobalKey<FormState>();
   final TextEditingController _daysController = TextEditingController(
     text: '50',
   );
@@ -64,13 +65,8 @@ class _MainAppState extends State<MainApp> {
       _candles = [];
     });
 
-    String? errorMsg;
     try {
-      final days = int.tryParse(_daysController.text) ?? 50;
-      if (days > 365 || days < 1) {
-        errorMsg = 'Days must be between 1 and 365';
-        throw Exception(errorMsg);
-      }
+      final days = int.tryParse(_daysController.text)!;
 
       // Replace 'demo' with your Alpha Vantage API key
       final response = await http
@@ -85,7 +81,7 @@ class _MainAppState extends State<MainApp> {
 
       if (response.statusCode != 200) {
         errorMsg = 'HTTP ${response.statusCode}';
-        throw HttpException(errorMsg);
+        throw Exception(errorMsg);
       }
 
       final data = json.decode(response.body) as Map<String, dynamic>;
@@ -132,11 +128,14 @@ class _MainAppState extends State<MainApp> {
         _candles = candles;
       });
     } catch (e) {
-      errorMsg ??= e.toString();
+      final errorMsg = e.toString();
       await _log('Refresh error: $errorMsg');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(errorMsg ?? 'Unknown error'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text(errorMsg),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } finally {
@@ -161,30 +160,54 @@ class _MainAppState extends State<MainApp> {
               children: [
                 Padding(
                   padding: const EdgeInsets.all(16.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      SizedBox(
-                        width: 100,
-                        child: TextField(
-                          controller: _daysController,
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                          decoration: const InputDecoration(labelText: 'Days'),
+                  child: Form(
+                    key: _formKey,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: 100,
+                          child: TextFormField(
+                            controller: _daysController,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                            ],
+                            decoration: const InputDecoration(
+                              labelText: 'Days',
+                            ),
+                            validator: (value) {
+                              if (value == null || value.isEmpty)
+                                return 'Enter number of days';
+                              final days = int.tryParse(value);
+                              if (days == null) return 'Invalid number';
+                              if (days < 1 || days > 365)
+                                return 'Days must be 1-365';
+                              return null;
+                            },
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      ElevatedButton(
-                        onPressed: _isLoading ? null : _refresh,
-                        child: _isLoading
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Text('Refresh'),
-                      ),
-                    ],
+                        const SizedBox(width: 16),
+                        ElevatedButton(
+                          onPressed: _isLoading
+                              ? null
+                              : () {
+                                  if (_formKey.currentState!.validate()) {
+                                    _refresh();
+                                  }
+                                },
+                          child: _isLoading
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Text('Refresh'),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 Expanded(
@@ -202,10 +225,13 @@ class _MainAppState extends State<MainApp> {
                             CandleSeries<CandleData, DateTime>(
                               dataSource: _candles,
                               xValueMapper: (CandleData data, _) => data.date,
-                              highValueMapper: (CandleData data, _) => data.high,
+                              highValueMapper: (CandleData data, _) =>
+                                  data.high,
                               lowValueMapper: (CandleData data, _) => data.low,
-                              openValueMapper: (CandleData data, _) => data.open,
-                              closeValueMapper: (CandleData data, _) => data.close,
+                              openValueMapper: (CandleData data, _) =>
+                                  data.open,
+                              closeValueMapper: (CandleData data, _) =>
+                                  data.close,
                             ),
                           ],
                         ),
@@ -221,7 +247,10 @@ class _MainAppState extends State<MainApp> {
                     children: [
                       CircularProgressIndicator(),
                       SizedBox(height: 16),
-                      Text('Loading EUR/USD data...', style: TextStyle(color: Colors.white)),
+                      Text(
+                        'Loading EUR/USD data...',
+                        style: TextStyle(color: Colors.white),
+                      ),
                     ],
                   ),
                 ),

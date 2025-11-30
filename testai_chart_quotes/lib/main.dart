@@ -147,16 +147,53 @@ class _QuotesHomePageState extends State<QuotesHomePage> {
                     ),
                   ),
                 const SizedBox(width: 8),
-                Expanded(
-                  child: TextField(
-                    controller: _daysController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: "Days",
-                      hintText: "Enter number of days",
-                      border: OutlineInputBorder(),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Checkbox(
+                      value: _smaEnabled,
+                      onChanged: _isLoading
+                          ? null
+                          : (val) {
+                              setState(() {
+                                _smaEnabled = val ?? false;
+                              });
+                            },
                     ),
-                  ),
+                    const Text("Show Simple Moving Average"),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      width: 54,
+                      child: TextField(
+                        controller: _smaPeriodController,
+                        keyboardType: TextInputType.number,
+                        enabled: !_isLoading && _smaEnabled,
+                        decoration: const InputDecoration(
+                          labelText: "Period",
+                          isDense: true,
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                        ),
+                        onChanged: (_) => setState((){}),
+                      ),
+                    ),
+                    const SizedBox(width: 18),
+                    // Days input
+                    SizedBox(
+                      width: 65,
+                      child: TextField(
+                        controller: _daysController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: "Days",
+                          hintText: "Enter days",
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(width: 16),
                 ElevatedButton(

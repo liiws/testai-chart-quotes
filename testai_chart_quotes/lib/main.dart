@@ -123,19 +123,39 @@ class _QuotesHomePageState extends State<QuotesHomePage> {
                             });
                         },
                   child: _isLoading
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                      ? Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                            const SizedBox(width: 8),
+                            const Text("Loading..."),
+                          ],
+                        )
                       : const Text("Refresh"),
                 ),
               ],
             ),
           ),
           Expanded(
-            child: _candles.isEmpty
-                ? const Center(child: Text("No valid chart data available.\nTry again later or check your API key."))
-                : Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: CustomCandlesChart(candles: _candles),
-                ),
+            child: Stack(
+              children: [
+                _candles.isEmpty
+                    ? const Center(child: Text("No valid chart data available.\nTry again later or check your API key."))
+                    : Padding(
+                        padding: const EdgeInsets.all(8),
+                        child: CustomCandlesChart(candles: _candles),
+                      ),
+                if (_isLoading)
+                  Container(
+                    color: Colors.white54,
+                    child: const Center(child: CircularProgressIndicator()),
+                  ),
+              ],
+            ),
           ),
         ],
       ),

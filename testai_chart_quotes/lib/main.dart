@@ -122,7 +122,7 @@ class _QuotesHomePageState extends State<QuotesHomePage> {
                 ? const Center(child: Text("No valid chart data available.\nTry again later or check your API key."))
                 : Padding(
                   padding: const EdgeInsets.all(8),
-                  child: CandleStickChartWidget(candles: _candles),
+                  child: CustomCandlesChart(candles: _candles),
                 ),
           ),
         ],
@@ -172,52 +172,79 @@ class _QuotesHomePageState extends State<QuotesHomePage> {
   }
 }
 
-/// This is a replacement for 'candlesticks' package: renders candles with fl_chart
-class CandleStickChartWidget extends StatelessWidget {
-  final List<dynamic> candles; // List<Candle>
-
-  const CandleStickChartWidget({required this.candles, Key? key}) : super(key: key);
+/// Cross-platform simple candlestick chart using CustomPainter.
+/// Requires: List<Candle> candles, all with finite values.
+class CustomCandlesChart extends StatelessWidget {
+  final List<Candle> candles;
+  const CustomCandlesChart({required this.candles, Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    if (candles.isEmpty) {
-      return const Center(child: Text("No chart data."));
+    final valid = candles.where((c) =>
+        [c.open, c.high, c.low, c.close].every((x) => x.isFinite)).toList();
+    if (valid.isEmpty) {
+      return const Center(child: Text("No valid candles to display."));
     }
-    final candleData = candles;
-    final visible = candleData.length > 40
-        ? candleData.sublist(candleData.length - 40)
-        : candleData;
+    // Limit to the last 40 candles for visibility
+    final chartCandles = valid.length > 40 ? valid.sublist(valid.length - 40) : valid;
     return AspectRatio(
       aspectRatio: 1.7,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8.0),
-        child: CandlestickChart(
-          candles: visible,
-        ),
+      child: CustomPaint(
+        painter: _CustomCandlesPainter(chartCandles),
+        child: Container(),
       ),
     );
   }
 }
 
-class CandlestickChart extends StatelessWidget {
-  final List<dynamic> candles;
-  const CandlestickChart({required this.candles, Key? key}) : super(key: key);
+class _CustomCandlesPainter extends CustomPainter {
+  final List<Candle> candles;
+  _CustomCandlesPainter(this.candles);
 
   @override
-  Widget build(BuildContext context) {
-    final minLow = candles.map((c) => c.low).reduce((a, b) => a < b ? a : b);
-    final maxHigh = candles.map((c) => c.high).reduce((a, b) => a > b ? a : b);
-    return CandlestickChart(
-      candles: List.generate(candles.length, (i) {
-        final c = candles[i];
-        return CandlestickChartCandleData(
-          x: i,
-          open: c.open,
-          high: c.high,
-          low: c.low,
-          close: c.close,
-        );
-      }),
-    );
+  void paint(Canvas canvas, Size size) {
+    final minPrice = candles.map((c) => c.low).reduce((a, b) => a < b ? a : b);
+    final maxPrice = candles.map((c) => c.high).reduce((a, b) => a > b ? a : b);
+    final priceRange = (maxPrice - minPrice) == 0 ? 1 : (maxPrice - minPrice);
+    final candleWidth = size.width / candles.length * 0.7;
+    final spacing = size.width / candles.length;
+
+    for (int i = 0; i < candles.length; i++) {
+      final c = candles[i];
+      final isBull = c.close >= c.open;
+      final color = isBull ? Colors.green : Colors.red;
+
+      final double x = spacing * i + spacing / 2;
+      final double yOpen  = size.height * (1 - (c.open - minPrice) / priceRange);
+      final double yClose = size.height * (1 - (c.close - minPrice) / priceRange);
+      final double yHigh  = size.height * (1 - (c.high - minPrice) / priceRange);
+      final double yLow   = size.height * (1 - (c.low - minPrice) / priceRange);
+
+      // Wick (high-low)
+      canvas.drawLine(
+          Offset(x, yHigh), Offset(x, yLow),
+          Paint()
+            ..color = color
+            ..strokeWidth = 2);
+
+      // Body (open-close)
+      double top = yOpen;
+      double bottom = yClose;
+      if (yOpen > yClose) {
+        top = yClose;
+        bottom = yOpen;
+      }
+      final rect = Rect.fromLTRB(
+        x - candleWidth / 2,
+        top,
+        x + candleWidth / 2,
+        bottom == top ? bottom + 1 : bottom,
+      );
+      canvas.drawRect(rect, Paint()..color = color);
+    }
   }
+
+  @override
+  bool shouldRepaint(_CustomCandlesPainter oldDelegate) =>
+      oldDelegate.candles != candles;
 }

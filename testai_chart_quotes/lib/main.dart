@@ -72,8 +72,12 @@ class _QuotesHomePageState extends State<QuotesHomePage> {
                             if (response.statusCode == 200) {
                                 final data = response.body;
                                 final candles = _parseAlphaVantageToCandles(data, days);
+                                print("PARSED ${candles.length} CANDLES:");
+                                for (var c in candles) {
+                                  print("Candle: date=${c.date}, o=${c.open}, h=${c.high}, l=${c.low}, c=${c.close}");
+                                }
                                 setState(() {
-                                  _candles = candles;
+                                  _candles = candles.isEmpty ? [] : candles;
                                 });
                               } else {
                                 ScaffoldMessenger.of(context).showSnackBar(
@@ -98,7 +102,7 @@ class _QuotesHomePageState extends State<QuotesHomePage> {
           ),
           Expanded(
             child: _candles.isEmpty
-                ? const Center(child: Text("No data yet. Click Refresh to load chart."))
+                ? const Center(child: Text("No valid chart data available.\nTry again later or check your API key."))
                 : Padding(
                   padding: const EdgeInsets.all(8),
                   child: Candlesticks(

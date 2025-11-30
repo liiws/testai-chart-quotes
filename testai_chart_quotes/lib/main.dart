@@ -89,17 +89,17 @@ class _MainAppState extends State<MainApp> {
         throw Exception('API Error: ${data['Error Message']}');
       }
       if (data['Note'] != null) {
-      if (data['Note'] != null) {
         throw Exception('API Note: ${data['Note']}');
       }
-      final timeSeries =
-          data['Time Series FX (Daily)'] as Map<String, dynamic>?;
+
       final timeSeries =
           data['Time Series FX (Daily)'] as Map<String, dynamic>?;
 
       if (timeSeries == null || timeSeries.isEmpty) {
         throw Exception('No time series data found');
-      }inal List<CandleData> candles = [];
+      }
+
+      final List<CandleData> candles = [];
       final entries = timeSeries.entries.take(days);
       for (final entry in entries) {
         try {
@@ -128,10 +128,7 @@ class _MainAppState extends State<MainApp> {
       await _log('Refresh error: $errorMsg');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMsg),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text(errorMsg), backgroundColor: Colors.red),
         );
       }
     } finally {

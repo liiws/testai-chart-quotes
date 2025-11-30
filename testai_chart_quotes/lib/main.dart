@@ -39,9 +39,16 @@ class _QuoteHomePageState extends State<QuoteHomePage> {
       _candles = [];
     });
     final days = int.tryParse(_daysController.text) ?? 50;
-    final apiKey = 'demo';
+    final apiKey = '<YOUR_ALPHA_VANTAGE_API_KEY>';
+    if (apiKey.startsWith('<YOUR')) {
+      setState(() {
+        _loading = false;
+        _error = 'Please set your Alpha Vantage API key in the source code.';
+      });
+      return;
+    }
     final url =
-        'https://www.alphavantage.co/query?function=FX_DAILY&from_symbol=EUR&to_symbol=USD&apikey=$apiKey';
+      'https://www.alphavantage.co/query?function=FX_DAILY&from_symbol=EUR&to_symbol=USD&apikey=$apiKey&outputsize=compact';
     try {
       final response = await http.get(Uri.parse(url));
       if (response.statusCode != 200) {
@@ -49,7 +56,7 @@ class _QuoteHomePageState extends State<QuoteHomePage> {
       }
       final data = json.decode(response.body);
       if (!data.containsKey('Time Series FX (Daily)')) {
-        throw Exception(data['Error Message'] ?? 'No prices found');
+        throw Exception(data['Error Message'] ?? data['Note'] ?? 'No prices found');
       }
       final prices = data['Time Series FX (Daily)'] as Map<String, dynamic>;
       final candles = prices.entries
@@ -58,6 +65,7 @@ class _QuoteHomePageState extends State<QuoteHomePage> {
           .toList();
       setState(() {
         _candles = candles.reversed.toList();
+        _error = null;
       });
     } catch (e) {
       setState(() {
@@ -199,7 +207,47 @@ class CandlestickChartPainterWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Replace with proper fl_chart rendering
-    return const Center(child: Text('Chart coming soon!'));
+    // Render candlesticks using fl_chart
+    // x axis: index or date; y axis: price
+    final minY = candles.map((c) => c.low).reduce((a, b) => a < b ? a : b);
+    final maxY = candles.map((c) => c.high).reduce((a, b) => a > b ? a : b);
+    return CandleStickChart(
+      CandleStickChartData(
+        candleData: [
+          for (int i = 0; i < candles.length; i++)
+            CandleStickChartItem(
+              x: i.toDouble(),
+              open: candles[i].open,
+              high: candles[i].high,
+              low: candles[i].low,
+              close: candles[i].close,
+            ),
+        ],
+        minY: minY,
+        maxY: maxY,
+        gridData: const FlGridData(show: true),
+        borderData: FlBorderData(show: true),
+        titlesData: FlTitlesData(
+          leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true)),
+          rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              getTitlesWidget: (value, meta) {
+                final idx = value.round();
+                if (idx < 0 || idx >= candles.length) return const SizedBox();
+                final dt = candles[idx].date;
+                // Show every 10th tick to reduce clutter
+                if (idx % 10 == 0 || idx == candles.length - 1) {
+                  return Text('${dt.month}/${dt.day}');
+                }
+                return const SizedBox();
+              },
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

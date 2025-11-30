@@ -71,6 +71,7 @@ class _QuotesHomePageState extends State<QuotesHomePage> {
                             final response = await http.get(Uri.parse(url));
                             if (response.statusCode == 200) {
                                 final data = response.body;
+                                // print(data);
                                 final candles = _parseAlphaVantageToCandles(data, days);
                                 print("PARSED ${candles.length} CANDLES:");
                                 for (var c in candles) {
@@ -105,8 +106,36 @@ class _QuotesHomePageState extends State<QuotesHomePage> {
                 ? const Center(child: Text("No valid chart data available.\nTry again later or check your API key."))
                 : Padding(
                   padding: const EdgeInsets.all(8),
-                  child: Candlesticks(
-                    candles: _candles,
+                  child: Builder(
+                    builder: (context) {
+                      // Defensive: check for all prices identical, or outliers causing bad values
+                      final candles = List<Candle>.from(_candles);
+                      bool allPricesSame = candles
+                        .every((c) => c.open == candles[0].open && c.high == candles[0].high && c.low == candles[0].low && c.close == candles[0].close);
+                      if (allPricesSame) {
+                        final epsilon = 0.00001;
+                        candles[0] = Candle(
+                          date: candles[0].date,
+                          open: candles[0].open + epsilon,
+                          high: candles[0].high + epsilon,
+                          low: candles[0].low + epsilon,
+                          close: candles[0].close + epsilon,
+                          volume: candles[0].volume,
+                        );
+                      }
+                      final validCandles = candles.where((c) =>
+                        c.open.isFinite &&
+                        c.high.isFinite &&
+                        c.low.isFinite &&
+                        c.close.isFinite &&
+                        c.open > 0 && c.high > 0 && c.low > 0 && c.close > 0
+                      ).toList();
+                      return validCandles.isEmpty
+                        ? const Center(child: Text("No valid chart data available."))
+                        : Candlesticks(
+                            candles: validCandles.length > 20 ? validCandles.sublist(validCandles.length-20) : validCandles,
+                          );
+                    },
                   ),
                 ),
           ),

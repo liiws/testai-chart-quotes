@@ -78,7 +78,16 @@ class _QuotesHomePageState extends State<QuotesHomePage> {
                   onPressed: _isLoading
                       ? null
                       : () async {
-                          int days = int.tryParse(_daysController.text) ?? 50;
+                          String input = _daysController.text.trim();
+                          int? days = int.tryParse(input);
+                          if (days == null || days < 1 || days > 200) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text("Enter a valid number of days (1-200)."),
+                              ),
+                            );
+                            return;
+                          }
                           setState(() {
                             _isLoading = true;
                           });

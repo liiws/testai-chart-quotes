@@ -49,6 +49,10 @@ class _QuotesHomePageState extends State<QuotesHomePage> {
   List<Candle> _candles = [];
   bool _isLoading = false;
 
+  // --- SMA state ---
+  bool _smaEnabled = true;
+  final TextEditingController _smaPeriodController = TextEditingController(text: "7");
+
   // timeframes: id as AlphaVantage param, txt as button label, avFn as the query function
   static const _timeframeButtons = [
     {"id": "M1", "txt": "M1"},
@@ -196,7 +200,11 @@ class _QuotesHomePageState extends State<QuotesHomePage> {
                     ? const Center(child: Text("No valid chart data available.\nTry again later or check your API key."))
                     : Padding(
                         padding: const EdgeInsets.all(8),
-                        child: CustomCandlesChart(candles: _candles),
+                        child: CustomCandlesChart(
+                          candles: _candles,
+                          smaEnabled: _smaEnabled,
+                          smaPeriod: int.tryParse(_smaPeriodController.text) ?? 7,
+                        ),
                       ),
                 if (_isLoading)
                   Container(
@@ -305,7 +313,14 @@ Future<void> logError(String message) async {
 /// Requires: List<Candle> candles, all with finite values.
 class CustomCandlesChart extends StatelessWidget {
   final List<Candle> candles;
-  const CustomCandlesChart({required this.candles, Key? key}) : super(key: key);
+  final bool smaEnabled;
+  final int smaPeriod;
+  const CustomCandlesChart({
+    required this.candles,
+    this.smaEnabled = false,
+    this.smaPeriod = 7,
+    Key? key,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -316,19 +331,56 @@ class CustomCandlesChart extends StatelessWidget {
     }
     // Limit to the last 40 candles for visibility
     final chartCandles = valid.length > 40 ? valid.sublist(valid.length - 40) : valid;
+    final List<SmaDot>? smaDots;
+    if (smaEnabled && smaPeriod > 1 && chartCandles.length >= smaPeriod) {
+      smaDots = _calcSma(chartCandles, smaPeriod);
+    } else {
+      smaDots = null;
+    }
     return AspectRatio(
       aspectRatio: 1.7,
       child: CustomPaint(
-        painter: _CustomCandlesPainter(chartCandles),
+        painter: _CustomCandlesPainter(chartCandles, smaDots: smaDots),
         child: Container(),
       ),
     );
   }
 }
 
+// Utility class and function for SMA line
+class SmaDot {
+  final double x, y;
+  SmaDot(this.x, this.y);
+}
+
+List<SmaDot> _calcSma(List<Candle> candles, int period) {
+  if (candles.length < period) return [];
+  final closes = candles.map((c) => c.close).toList();
+  final minPrice = candles.map((c) => c.low).reduce((a, b) => a < b ? a : b);
+  final maxPrice = candles.map((c) => c.high).reduce((a, b) => a > b ? a : b);
+  final priceRange = (maxPrice - minPrice) == 0 ? 1 : (maxPrice - minPrice);
+
+  List<SmaDot> dots = [];
+  for (int i = period - 1; i < closes.length; i++) {
+    double sum = 0;
+    for (int j = 0; j < period; j++) {
+      sum += closes[i - j];
+    }
+    double sma = sum / period;
+    final idx = i;
+    dots.add(SmaDot(
+      idx.toDouble(),
+      (1 - (sma - minPrice) / priceRange),
+    ));
+  }
+  return dots;
+}
+
 class _CustomCandlesPainter extends CustomPainter {
   final List<Candle> candles;
-  _CustomCandlesPainter(this.candles);
+  final List<SmaDot>? smaDots;
+
+  _CustomCandlesPainter(this.candles, {this.smaDots});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -371,9 +423,31 @@ class _CustomCandlesPainter extends CustomPainter {
       );
       canvas.drawRect(rect, Paint()..color = color);
     }
+
+    // Draw SMA line if present
+    if (smaDots != null && smaDots!.length > 1) {
+      final smaPaint = Paint()
+        ..color = Colors.blue
+        ..strokeWidth = 2;
+      final xscale = size.width / candles.length;
+      for (int i = 1; i < smaDots!.length; i++) {
+        final prev = smaDots![i - 1];
+        final next = smaDots![i];
+        final p1 = Offset(
+          xscale * (prev.x + 0.5),
+          size.height * prev.y
+        );
+        final p2 = Offset(
+          xscale * (next.x + 0.5),
+          size.height * next.y
+        );
+        canvas.drawLine(p1, p2, smaPaint);
+      }
+    }
   }
 
   @override
   bool shouldRepaint(_CustomCandlesPainter oldDelegate) =>
-      oldDelegate.candles != candles;
+      oldDelegate.candles != candles ||
+      oldDelegate.smaDots != smaDots;
 }

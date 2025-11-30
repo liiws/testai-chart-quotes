@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:fl_chart/fl_chart.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
 
 // Simple candle model for our chart (date + OHLC)
 class Candle {
@@ -87,23 +90,32 @@ class _QuotesHomePageState extends State<QuotesHomePage> {
                             final response = await http.get(Uri.parse(url));
                             if (response.statusCode == 200) {
                                 final data = response.body;
-                                // print(data);
-                                final candles = _parseAlphaVantageToCandles(data, days);
-                                print("PARSED ${candles.length} CANDLES:");
-                                for (var c in candles) {
-                                  print("Candle: date=${c.date}, o=${c.open}, h=${c.high}, l=${c.low}, c=${c.close}");
+                                try {
+                                  final candles = _parseAlphaVantageToCandles(data, days);
+                                  print("PARSED ${candles.length} CANDLES:");
+                                  for (var c in candles) {
+                                    print("Candle: date=${c.date}, o=${c.open}, h=${c.high}, l=${c.low}, c=${c.close}");
+                                  }
+                                  setState(() {
+                                    _candles = candles.isEmpty ? [] : candles;
+                                  });
+                                } catch (e, st) {
+                                  await logError("Parse error: $e\n$st\n$data");
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text("Error parsing quotes data.")),
+                                  );
                                 }
-                                setState(() {
-                                  _candles = candles.isEmpty ? [] : candles;
-                                });
                               } else {
+                                final errorMsg = "HTTP error: ${response.statusCode}\n${response.body}";
+                                await logError(errorMsg);
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text("Failed to fetch data")),
+                                  const SnackBar(content: Text("Failed to fetch data (network error).")),
                                 );
                               }
-                            } catch (_) {
+                            } catch (e, st) {
+                              await logError("Exception: $e\n$st");
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text("Network error")),
+                                const SnackBar(content: Text("Network or logic error (see log.txt)")),
                               );
                             }
                             setState(() {
@@ -172,6 +184,21 @@ class _QuotesHomePageState extends State<QuotesHomePage> {
   }
 }
 
+Future<void> logError(String message) async {
+  try {
+    final now = DateTime.now().toIso8601String();
+    final Directory dir = await getApplicationDocumentsDirectory();
+    final file = File(p.join(dir.path, 'log.txt'));
+    await file.writeAsString(
+      "[$now] $message\n",
+      mode: FileMode.append,
+      flush: true,
+    );
+  } catch (e) {
+    // ignore log errors to avoid recursion
+  }
+}
+ 
 /// Cross-platform simple candlestick chart using CustomPainter.
 /// Requires: List<Candle> candles, all with finite values.
 class CustomCandlesChart extends StatelessWidget {

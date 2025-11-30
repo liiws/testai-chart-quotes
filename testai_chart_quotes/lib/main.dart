@@ -39,7 +39,7 @@ class _QuoteHomePageState extends State<QuoteHomePage> {
       _candles = [];
     });
     final days = int.tryParse(_daysController.text) ?? 50;
-    final apiKey = '<YOUR_ALPHA_VANTAGE_API_KEY>';
+    final apiKey = 'demo';
     if (apiKey.startsWith('<YOUR')) {
       setState(() {
         _loading = false;
@@ -48,7 +48,7 @@ class _QuoteHomePageState extends State<QuoteHomePage> {
       return;
     }
     final url =
-      'https://www.alphavantage.co/query?function=FX_DAILY&from_symbol=EUR&to_symbol=USD&apikey=$apiKey&outputsize=compact';
+      'https://www.alphavantage.co/query?function=FX_DAILY&from_symbol=EUR&to_symbol=USD&apikey=$apiKey';
     try {
       final response = await http.get(Uri.parse(url));
       if (response.statusCode != 200) {

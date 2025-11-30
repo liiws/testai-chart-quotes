@@ -1,7 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:candlesticks/candlesticks.dart';
+import 'package:fl_chart/fl_chart.dart';
+
+// Simple candle model for our chart (date + OHLC)
+class Candle {
+  final DateTime date;
+  final double open;
+  final double high;
+  final double low;
+  final double close;
+  Candle({
+    required this.date,
+    required this.open,
+    required this.high,
+    required this.low,
+    required this.close,
+  });
+}
 
 void main() {
   runApp(const MainApp());
@@ -106,37 +122,7 @@ class _QuotesHomePageState extends State<QuotesHomePage> {
                 ? const Center(child: Text("No valid chart data available.\nTry again later or check your API key."))
                 : Padding(
                   padding: const EdgeInsets.all(8),
-                  child: Builder(
-                    builder: (context) {
-                      // Defensive: check for all prices identical, or outliers causing bad values
-                      final candles = List<Candle>.from(_candles);
-                      bool allPricesSame = candles
-                        .every((c) => c.open == candles[0].open && c.high == candles[0].high && c.low == candles[0].low && c.close == candles[0].close);
-                      if (allPricesSame) {
-                        final epsilon = 0.00001;
-                        candles[0] = Candle(
-                          date: candles[0].date,
-                          open: candles[0].open + epsilon,
-                          high: candles[0].high + epsilon,
-                          low: candles[0].low + epsilon,
-                          close: candles[0].close + epsilon,
-                          volume: candles[0].volume,
-                        );
-                      }
-                      final validCandles = candles.where((c) =>
-                        c.open.isFinite &&
-                        c.high.isFinite &&
-                        c.low.isFinite &&
-                        c.close.isFinite &&
-                        c.open > 0 && c.high > 0 && c.low > 0 && c.close > 0
-                      ).toList();
-                      return validCandles.isEmpty
-                        ? const Center(child: Text("No valid chart data available."))
-                        : Candlesticks(
-                            candles: validCandles.length > 20 ? validCandles.sublist(validCandles.length-20) : validCandles,
-                          );
-                    },
-                  ),
+                  child: CandleStickChartWidget(candles: _candles),
                 ),
           ),
         ],
@@ -172,7 +158,6 @@ class _QuotesHomePageState extends State<QuotesHomePage> {
               high: high,
               low: low,
               close: close,
-              volume: 0,
             ),
           );
         } catch (_) {
@@ -184,5 +169,55 @@ class _QuotesHomePageState extends State<QuotesHomePage> {
     } catch (_) {
       return [];
     }
+  }
+}
+
+/// This is a replacement for 'candlesticks' package: renders candles with fl_chart
+class CandleStickChartWidget extends StatelessWidget {
+  final List<dynamic> candles; // List<Candle>
+
+  const CandleStickChartWidget({required this.candles, Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    if (candles.isEmpty) {
+      return const Center(child: Text("No chart data."));
+    }
+    final candleData = candles;
+    final visible = candleData.length > 40
+        ? candleData.sublist(candleData.length - 40)
+        : candleData;
+    return AspectRatio(
+      aspectRatio: 1.7,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8.0),
+        child: CandlestickChart(
+          candles: visible,
+        ),
+      ),
+    );
+  }
+}
+
+class CandlestickChart extends StatelessWidget {
+  final List<dynamic> candles;
+  const CandlestickChart({required this.candles, Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final minLow = candles.map((c) => c.low).reduce((a, b) => a < b ? a : b);
+    final maxHigh = candles.map((c) => c.high).reduce((a, b) => a > b ? a : b);
+    return CandlestickChart(
+      candles: List.generate(candles.length, (i) {
+        final c = candles[i];
+        return CandlestickChartCandleData(
+          x: i,
+          open: c.open,
+          high: c.high,
+          low: c.low,
+          close: c.close,
+        );
+      }),
+    );
   }
 }

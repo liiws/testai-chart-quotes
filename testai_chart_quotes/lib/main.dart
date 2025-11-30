@@ -80,30 +80,26 @@ class _MainAppState extends State<MainApp> {
       await _log('API response status: ${response.statusCode}');
 
       if (response.statusCode != 200) {
-        errorMsg = 'HTTP ${response.statusCode}';
-        throw Exception(errorMsg);
+        throw Exception('HTTP ${response.statusCode}');
       }
 
       final data = json.decode(response.body) as Map<String, dynamic>;
 
       if (data['Error Message'] != null) {
-        errorMsg = data['Error Message'];
-        throw Exception('API Error: $errorMsg');
+        throw Exception('API Error: ${data['Error Message']}');
       }
       if (data['Note'] != null) {
-        errorMsg = data['Note'];
-        throw Exception('API Note: $errorMsg');
+      if (data['Note'] != null) {
+        throw Exception('API Note: ${data['Note']}');
       }
-
+      final timeSeries =
+          data['Time Series FX (Daily)'] as Map<String, dynamic>?;
       final timeSeries =
           data['Time Series FX (Daily)'] as Map<String, dynamic>?;
 
       if (timeSeries == null || timeSeries.isEmpty) {
-        errorMsg = 'No time series data found';
-        throw Exception(errorMsg);
-      }
-
-      final List<CandleData> candles = [];
+        throw Exception('No time series data found');
+      }inal List<CandleData> candles = [];
       final entries = timeSeries.entries.take(days);
       for (final entry in entries) {
         try {

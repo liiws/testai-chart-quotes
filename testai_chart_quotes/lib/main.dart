@@ -136,7 +136,7 @@ class _MainAppState extends State<MainApp> {
       await _log('Refresh error: $errorMsg');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(errorMsg!), backgroundColor: Colors.red),
+          SnackBar(content: Text(errorMsg ?? 'Unknown error'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -155,61 +155,77 @@ class _MainAppState extends State<MainApp> {
       theme: ThemeData(primarySwatch: Colors.blue),
       home: Scaffold(
         appBar: AppBar(title: const Text('EUR/USD Quotes')),
-        body: Column(
+        body: Stack(
           children: [
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SizedBox(
-                    width: 100,
-                    child: TextField(
-                      controller: _daysController,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      decoration: const InputDecoration(labelText: 'Days'),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  ElevatedButton(
-                    onPressed: _isLoading ? null : _refresh,
-                    child: _isLoading
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('Refresh'),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: _candles.isEmpty && !_isLoading
-                  ? const Center(
-                      child: Text('Press Refresh to load EUR/USD data'),
-                    )
-                  : _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : SfCartesianChart(
-                      trackballBehavior: TrackballBehavior(
-                        enable: true,
-                        activationMode: ActivationMode.singleTap,
-                      ),
-                      primaryXAxis: DateTimeAxis(),
-                      series: <CandleSeries<CandleData, DateTime>>[
-                        CandleSeries<CandleData, DateTime>(
-                          dataSource: _candles,
-                          xValueMapper: (CandleData data, _) => data.date,
-                          highValueMapper: (CandleData data, _) => data.high,
-                          lowValueMapper: (CandleData data, _) => data.low,
-                          openValueMapper: (CandleData data, _) => data.open,
-                          closeValueMapper: (CandleData data, _) => data.close,
+            Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 100,
+                        child: TextField(
+                          controller: _daysController,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                          decoration: const InputDecoration(labelText: 'Days'),
                         ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(width: 16),
+                      ElevatedButton(
+                        onPressed: _isLoading ? null : _refresh,
+                        child: _isLoading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Text('Refresh'),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: _candles.isEmpty && !_isLoading
+                      ? const Center(
+                          child: Text('Press Refresh to load EUR/USD data'),
+                        )
+                      : SfCartesianChart(
+                          trackballBehavior: TrackballBehavior(
+                            enable: true,
+                            activationMode: ActivationMode.singleTap,
+                          ),
+                          primaryXAxis: DateTimeAxis(),
+                          series: <CandleSeries<CandleData, DateTime>>[
+                            CandleSeries<CandleData, DateTime>(
+                              dataSource: _candles,
+                              xValueMapper: (CandleData data, _) => data.date,
+                              highValueMapper: (CandleData data, _) => data.high,
+                              lowValueMapper: (CandleData data, _) => data.low,
+                              openValueMapper: (CandleData data, _) => data.open,
+                              closeValueMapper: (CandleData data, _) => data.close,
+                            ),
+                          ],
+                        ),
+                ),
+              ],
             ),
+            if (_isLoading)
+              Container(
+                color: Colors.black54,
+                child: const Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 16),
+                      Text('Loading EUR/USD data...', style: TextStyle(color: Colors.white)),
+                    ],
+                  ),
+                ),
+              ),
           ],
         ),
       ),
